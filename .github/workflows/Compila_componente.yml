@@ -13,24 +13,21 @@ jobs:
       
     - name: Baixa o Arduino-lib-builder
       run: | 
+        rm -rf ./tools/sdk/*
+        cd ~
         git clone https://github.com/bmorcelli/esp32-arduino-lib-builder.git
         cd esp32-arduino-lib-builder
         git branch -r
         git checkout -b release/v4.4 origin/release/v4.4
         git pull origin release/v4.4
-        rm -rf ./tools/sdk/*
-        
         
     - name: Instala os pré-requisitos
-      run: bash ./esp32-arduino-lib-builder/tools/prepare-ci.sh
+      run: bash ~/esp32-arduino-lib-builder/tools/prepare-ci.sh
       
     - name: Build Libs for esp32
       run: |
-        cd esp32-arduino-lib-builder
+        cd ~/esp32-arduino-lib-builder
         bash ./build.sh -I 'release/v4.4' -A 'idf-release/v4.4' -c '/home/runner/work/arduino-esp32/arduino-esp32/'
-        cd ..
-        rm -rf ./esp32-arduino-lib-builder/*
-        rm ./esp32-arduino-lib-builder
 
     - name: Set up Git
       run: |
