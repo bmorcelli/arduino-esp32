@@ -1,3 +1,5 @@
+# Bruce version without bootloader
+
 # Arduino core for the ESP32, ESP32-S2, ESP32-S3 and ESP32-C3
 
 ![Build Status](https://github.com/espressif/arduino-esp32/workflows/ESP32%20Arduino%20CI/badge.svg) [![Documentation Status](https://readthedocs.com/projects/espressif-arduino-esp32/badge/?version=latest)](https://docs.espressif.com/projects/arduino-esp32/en/latest/?badge=latest)
