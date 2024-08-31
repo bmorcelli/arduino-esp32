@@ -18,8 +18,8 @@ jobs:
         git clone https://github.com/bmorcelli/esp32-arduino-lib-builder.git
         cd esp32-arduino-lib-builder
         git branch -r
-        git checkout -b release/v4.4 origin/release/v4.4
-        git pull origin release/v4.4
+        git checkout -b release/v4.4b origin/release/v4.4b
+        git pull origin release/v4.4b
         
     - name: Instala os pré-requisitos
       run: bash ~/esp32-arduino-lib-builder/tools/prepare-ci.sh
