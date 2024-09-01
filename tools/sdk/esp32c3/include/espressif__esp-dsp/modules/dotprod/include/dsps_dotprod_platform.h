@@ -13,7 +13,7 @@
 #define dotprod_f32_ae32_enabled  1
 #define dotprode_f32_ae32_enabled 1
 
-#endif // 
+#endif //
 
 #if ((XCHAL_HAVE_LOOPS == 1) && (XCHAL_HAVE_MAC16 == 1))
 
@@ -26,7 +26,17 @@
 #if CONFIG_IDF_TARGET_ESP32S3
 #define dsps_dotprod_s16_aes3_enabled 1
 #define dsps_dotprod_f32_aes3_enabled 1
-#endif 
+#endif
+
+#if CONFIG_IDF_TARGET_ESP32P4
+#ifdef CONFIG_DSP_OPTIMIZED
+#define dsps_dotprod_s16_arp4_enabled 1
+#define dsps_dotprod_f32_arp4_enabled 1
+#else
+#define dsps_dotprod_s16_arp4_enabled 0
+#define dsps_dotprod_f32_arp4_enabled 0
+#endif // CONFIG_DSP_OPTIMIZED
+#endif
 
 
 #endif // _dsps_dotprod_platform_H_

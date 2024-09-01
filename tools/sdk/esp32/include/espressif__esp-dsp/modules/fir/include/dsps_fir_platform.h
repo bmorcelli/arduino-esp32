@@ -11,21 +11,30 @@
 #if ((XCHAL_HAVE_FP == 1) && (XCHAL_HAVE_LOOPS == 1))
 
 #if CONFIG_IDF_TARGET_ESP32S3
-    #define dsps_fird_f32_aes3_enabled  1
-    #define dsps_fird_f32_ae32_enabled  1
-    #define dsps_fird_s16_aes3_enabled 1
-    #define dsps_fird_s16_ae32_enabled 0
-    #define dsps_fir_f32_aes3_enabled  1
-    #define dsps_fir_f32_ae32_enabled  0
+#define dsps_fird_f32_aes3_enabled  1
+#define dsps_fird_f32_ae32_enabled  1
+#define dsps_fird_s16_aes3_enabled 1
+#define dsps_fird_s16_ae32_enabled 0
+#define dsps_fir_f32_aes3_enabled  1
+#define dsps_fir_f32_ae32_enabled  0
 #else
-    #define dsps_fird_f32_ae32_enabled  1
-    #define dsps_fird_s16_aes3_enabled 0
-    #define dsps_fird_s16_ae32_enabled 1
-    #define dsps_fir_f32_aes3_enabled  0
-    #define dsps_fir_f32_ae32_enabled  1
+#define dsps_fird_f32_ae32_enabled  1
+#define dsps_fird_s16_aes3_enabled 0
+#define dsps_fird_s16_ae32_enabled 1
+#define dsps_fir_f32_aes3_enabled  0
+#define dsps_fir_f32_ae32_enabled  1
 #endif
 
-#endif // 
+#endif //
 #endif // __XTENSA__
 
+#ifdef CONFIG_IDF_TARGET_ESP32P4
+#ifdef CONFIG_DSP_OPTIMIZED
+#define dsps_fird_f32_arp4_enabled 1
+#define dsps_fird_s16_arp4_enabled 1
+#else
+#define dsps_fird_f32_arp4_enabled 0
+#define dsps_fird_s16_arp4_enabled 0
+#endif // CONFIG_DSP_OPTIMIZED
+#endif
 #endif // _dsps_fir_platform_H_
