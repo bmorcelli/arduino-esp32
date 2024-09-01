@@ -1,0 +1,42 @@
+name: Compila e substitui os Componentes
+
+on:
+  workflow_dispatch:
+
+jobs:
+  compare-json:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Baixa o Arduino-lib-builder
+      run: | 
+        rm -rf ./tools/sdk/*
+        cd ~
+        git clone https://github.com/bmorcelli/esp32-arduino-lib-builder.git
+        cd esp32-arduino-lib-builder
+        git branch -r
+        git checkout -b release/v4.4 origin/release/v4.4
+        git pull origin release/v4.4
+        
+    - name: Instala os pré-requisitos
+      run: bash ~/esp32-arduino-lib-builder/tools/prepare-ci.sh
+      
+    - name: Build Libs for esp32
+      run: |
+        cd ~/esp32-arduino-lib-builder
+        bash ./build.sh -I 'release/v4.4c' -A 'idf-release/v4.4c' -c '/home/runner/work/arduino-esp32/arduino-esp32/'
+
+    - name: Set up Git
+      run: |
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git config user.name "github-actions[bot]"
+        
+    - name: Commit new components
+      id: compare
+      run: |
+        git add .
+        git commit -m "Components Update"
+        git push
