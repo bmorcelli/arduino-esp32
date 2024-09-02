@@ -31,6 +31,11 @@ jobs:
 
     - name: Set up Git
       run: |
+        rm ./tools/sdk/esp32/lib/libnet80211.a
+        rm ./tools/sdk/esp32s3/lib/libnet80211.a
+        cp ./deauth_patched_files/ESP32-lib/libnet80211.a ./tools/sdk/esp32/lib/
+        cp ./deauth_patched_files/ESP32s3-lib/libnet80211.a ./tools/sdk/esp32s3/lib/
+        
         git config user.email "github-actions[bot]@users.noreply.github.com"
         git config user.name "github-actions[bot]"
         
