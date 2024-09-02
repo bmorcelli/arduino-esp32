@@ -38,6 +38,8 @@
 #include "osal/osal.h"
 #include "common/tusb_fifo.h"
 
+#include "class/hid/hid.h"
+
 //------------- TypeC -------------//
 #if CFG_TUC_ENABLED
   #include "typec/usbc.h"

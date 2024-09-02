@@ -36,15 +36,15 @@ public:
      * @param[in] w: - amount of control measurements and noise inputs. Size of matrix G
     */
     ekf(int x, int w);
-
-
+    
+    
     /**
      * Distructor of EKF
     */
     virtual ~ekf();
     /**
      * Main processing method of the EKF.
-     *
+     * 
      * @param[in] u: - input measurements
      * @param[in] dt: - time difference from the last call in seconds
     */
@@ -57,15 +57,15 @@ public:
     */
     virtual void Init() = 0;
     /**
-     * xDot[n] = F*x[n] + G*u + W
+     * x[n] = F*x[n-1] + G*u + W
      * Number of states, X is the state vector (size of F matrix)
     */
-    int NUMX;
+    int NUMX; 
     /**
-     * xDot[n] = F*x[n] + G*u + W
+     * x[n] = F*x[n-1] + G*u + W
      * The size of G matrix
     */
-    int NUMW;
+    int NUMW; 
 
     /**
      * System state vector
@@ -73,11 +73,11 @@ public:
     dspm::Mat &X;
 
     /**
-     * Linearized system matrices F, where xDot[n] = F*x[n] + G*u + W
+     * Linearized system matrices F, where x[n] = F*x[n-1] + G*u + W
     */
     dspm::Mat &F;
     /**
-     * Linearized system matrices G, where xDot[n] = F*x[n] + G*u + W
+     * Linearized system matrices G, where x[n] = F*x[n-1] + G*u + W
     */
     dspm::Mat &G;
 
@@ -93,8 +93,8 @@ public:
 
     /**
      * Runge-Kutta state update method.
-     * The method calculates derivatives of input vector x and control measurements u
-     *
+	 * The method calculates derivatives of input vector x and control measurements u
+     * 
      * @param[in] x: state vector
      * @param[in] u: control measurement
      * @param[in] dt: time interval from last update in seconds
@@ -105,12 +105,11 @@ public:
 
     /**
      * Derivative of state vector X
-     * The default calculation: xDot = F*x + G*u
-     * It's possible to implement optimized version
+     * Re
      * @param[in] x: state vector
      * @param[in] u: control measurement
      * @return
-     *      xDot - derivative of input vector x and u
+     *      - derivative of input vector x and u
      */
     virtual dspm::Mat StateXdot(dspm::Mat &x, float *u);
     /**
@@ -125,7 +124,7 @@ public:
 
     /**
      * Calculates covariance prediction matrux P.
-     * Update matrix P
+	 * Update matrix P
      * @param[in] dt: time interval from last update
      */
     virtual void CovariancePrediction(float dt);
@@ -133,7 +132,7 @@ public:
     /**
      * Update of current state by measured values.
      * Optimized method for non correlated values
-     * Calculate Kalman gain and update matrix P and vector X.
+	 * Calculate Kalman gain and update matrix P and vector X. 
      * @param[in] H: derivative matrix
      * @param[in] measured: array of measured values
      * @param[in] expected: array of expected values
