@@ -9,7 +9,12 @@ jobs:
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip' # caching pip dependencies
+        
       
     - name: Baixa o Arduino-lib-builder
       run: | 
@@ -20,39 +25,14 @@ jobs:
         git branch -r
         git checkout -b release/v4.4 origin/release/v4.4
         git pull origin release/v4.4
-
+        
     - name: Instala os pré-requisitos
+      run: bash ~/esp32-arduino-lib-builder/tools/prepare-ci.sh
+      
+    - name: Build Libs for esp32
       run: |
-        sudo apt update && sudo apt install -y \
-          git wget curl libssl-dev libncurses-dev flex bison gperf \
-          python3.11 python3.11-venv
-
-    - name: Configura ambiente Python
-      run: |
-        python3.11 -m venv venv
-        source venv/bin/activate
-        curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-        python get-pip.py
-        # pip install --break-system-packages setuptools pyserial click future wheel cryptography pyparsing pyelftools
-        # pip install --break-system-packages setuptools pyserial click future wheel cryptography pyparsing pyelftools packaging
-        pip install --break-system-packages setuptools pyserial click future wheel cryptography pyparsing==2.0.3 pyelftools packaging 'urllib3<2' pygdbmi==0.9.0.2 kconfiglib==13.7.1 reedsolo==1.5.4 'bitstring>=3.1.6,<4' ecdsa==0.16.0 construct==2.10.69 'idf-component-manager~=1.2' collections
-
-
-    - name: Executa os scripts no ambiente virtual
-      run: |
-        source venv/bin/activate
-        bash ~/esp32-arduino-lib-builder/tools/prepare-ci.sh
         cd ~/esp32-arduino-lib-builder
         bash ./build.sh -I 'release/v4.4c' -A 'idf-release/v4.4c' -c '/home/runner/work/arduino-esp32/arduino-esp32/'
-
-        
-    #- name: Instala os pré-requisitos
-    #  run: bash ~/esp32-arduino-lib-builder/tools/prepare-ci.sh
-      
-    #- name: Build Libs for esp32
-    #  run: |
-    #    cd ~/esp32-arduino-lib-builder
-    #    bash ./build.sh -I 'release/v4.4c' -A 'idf-release/v4.4c' -c '/home/runner/work/arduino-esp32/arduino-esp32/'
 
     - name: Set up Git
       run: |
