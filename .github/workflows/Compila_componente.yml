@@ -35,7 +35,7 @@ jobs:
         python get-pip.py
         # pip install --break-system-packages setuptools pyserial click future wheel cryptography pyparsing pyelftools
         # pip install --break-system-packages setuptools pyserial click future wheel cryptography pyparsing pyelftools packaging
-        pip install --break-system-packages setuptools pyserial click future wheel cryptography pyparsing>=2.0.3,<2.4.0 pyelftools packaging urllib3<2 pygdbmi<=0.9.0.2 kconfiglib==13.7.1 reedsolo>=1.5.3,<=1.5.4 bitstring>=3.1.6,<4 ecdsa>=0.16.0 construct==2.10.69 --force-reinstall
+        pip install --break-system-packages setuptools pyserial click future wheel cryptography pyparsing==2.0.3 pyelftools packaging urllib3<2 pygdbmi==0.9.0.2 kconfiglib==13.7.1 reedsolo==1.5.4 bitstring>=3.1.6,<4 ecdsa==0.16.0 construct==2.10.69
 
 
     - name: Executa os scripts no ambiente virtual
