@@ -1,5 +1,5 @@
 esp-idf: release/v4.4c 621a7fa120
-arduino: idf-release/v4.4c 8753b269
+arduino: idf-release/v4.4c a0e4d0cd
 esp-dl: master 0632d24
 esp-rainmaker: master d8e9345
 esp32-camera: v2.0.8 f0bb429
