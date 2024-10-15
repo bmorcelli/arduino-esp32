@@ -20,6 +20,15 @@ jobs:
         git branch -r
         git checkout -b release/v4.4 origin/release/v4.4
         git pull origin release/v4.4
+
+    - name: Instala os pré-requisitos
+      run: |
+        sudo apt update && sudo apt install -y python3 python3-venv
+
+    - name: Configura ambiente Python
+      run: |
+        python3 -m venv venv
+        source venv/bin/activate
         
     - name: Instala os pré-requisitos
       run: bash ~/esp32-arduino-lib-builder/tools/prepare-ci.sh
