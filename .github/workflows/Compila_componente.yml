@@ -38,7 +38,7 @@ jobs:
 
     - name: Executa os scripts no ambiente virtual
       run: |
-        source ~/venv/bin/activate
+        source venv/bin/activate
         bash ~/esp32-arduino-lib-builder/tools/prepare-ci.sh
         cd ~/esp32-arduino-lib-builder
         bash ./build.sh -I 'release/v4.4c' -A 'idf-release/v4.4c' -c '/home/runner/work/arduino-esp32/arduino-esp32/'
