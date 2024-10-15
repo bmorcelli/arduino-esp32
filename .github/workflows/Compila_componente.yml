@@ -23,20 +23,34 @@ jobs:
 
     - name: Instala os pré-requisitos
       run: |
-        sudo apt update && sudo apt install -y python3 python3-venv
+        sudo apt update && sudo apt install -y \
+          git wget curl libssl-dev libncurses-dev flex bison gperf \
+          python3 python3-venv
 
     - name: Configura ambiente Python
       run: |
         python3 -m venv venv
         source venv/bin/activate
-        
-    - name: Instala os pré-requisitos
-      run: bash ~/esp32-arduino-lib-builder/tools/prepare-ci.sh
-      
-    - name: Build Libs for esp32
+        curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+        python get-pip.py
+        pip install --break-system-packages setuptools pyserial click future wheel cryptography pyparsing pyelftools
+
+
+    - name: Executa os scripts no ambiente virtual
       run: |
+        source ~/venv/bin/activate
+        bash ~/esp32-arduino-lib-builder/tools/prepare-ci.sh
         cd ~/esp32-arduino-lib-builder
         bash ./build.sh -I 'release/v4.4c' -A 'idf-release/v4.4c' -c '/home/runner/work/arduino-esp32/arduino-esp32/'
+
+        
+    #- name: Instala os pré-requisitos
+    #  run: bash ~/esp32-arduino-lib-builder/tools/prepare-ci.sh
+      
+    #- name: Build Libs for esp32
+    #  run: |
+    #    cd ~/esp32-arduino-lib-builder
+    #    bash ./build.sh -I 'release/v4.4c' -A 'idf-release/v4.4c' -c '/home/runner/work/arduino-esp32/arduino-esp32/'
 
     - name: Set up Git
       run: |
