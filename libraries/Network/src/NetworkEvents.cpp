@@ -3,10 +3,17 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+
+#include <new>  //std::nothrow
+
 #include "NetworkEvents.h"
 #include "NetworkManager.h"
 #include "esp_task.h"
 #include "esp32-hal.h"
+
+#ifndef ARDUINO_NETWORK_EVENT_TASK_STACK_SIZE
+#define ARDUINO_NETWORK_EVENT_TASK_STACK_SIZE 4096
+#endif
 
 NetworkEvents::NetworkEvents() : _arduino_event_group(NULL), _arduino_event_queue(NULL), _arduino_event_task_handle(NULL) {}
 
@@ -61,8 +68,8 @@ bool NetworkEvents::initNetworkEvents() {
       [](void *self) {
         static_cast<NetworkEvents *>(self)->_checkForEvent();
       },
-      "arduino_events",  // label
-      4096,              // event task's stack size
+      "arduino_events",                       // label
+      ARDUINO_NETWORK_EVENT_TASK_STACK_SIZE,  // event task's stack size
       this, ESP_TASKD_EVENT_PRIO - 1, &_arduino_event_task_handle, ARDUINO_EVENT_RUNNING_CORE
     );
     if (!_arduino_event_task_handle) {
@@ -78,7 +85,7 @@ bool NetworkEvents::postEvent(const arduino_event_t *data) {
   if (data == NULL || _arduino_event_queue == NULL) {
     return false;
   }
-  arduino_event_t *event = new arduino_event_t();
+  arduino_event_t *event = new (std::nothrow) arduino_event_t();
   if (event == NULL) {
     log_e("Arduino Event Malloc Failed!");
     return false;

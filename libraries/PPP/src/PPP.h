@@ -108,9 +108,13 @@ private:
   int _tx_buffer_size;
   esp_modem_dce_mode_t _mode;
   uint8_t _uart_num;
+  network_event_handle_t _ppp_event_handle;
 
   static bool pppDetachBus(void *bus_pointer);
 };
 
+#if !defined(NO_GLOBAL_INSTANCES) && !defined(NO_GLOBAL_PPP)
 extern PPPClass PPP;
+#endif
+
 #endif /* CONFIG_LWIP_PPP_SUPPORT && ARDUINO_HAS_ESP_MODEM */

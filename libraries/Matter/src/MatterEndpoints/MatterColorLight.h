@@ -1,4 +1,4 @@
-// Copyright 2024 Espressif Systems (Shanghai) PTE LTD
+// Copyright 2025 Espressif Systems (Shanghai) PTE LTD
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -66,8 +66,8 @@ public:
 
 protected:
   bool started = false;
-  bool onOffState = false;       // default initial state is off, but it can be changed by begin(bool)
-  espHsvColor_t colorHSV = {0};  // default initial color HSV is black, but it can be changed by begin(bool, espHsvColor_t)
+  bool onOffState = false;             // default initial state is off, but it can be changed by begin(bool)
+  espHsvColor_t colorHSV = {0, 0, 0};  // default initial color HSV is black, but it can be changed by begin(bool, espHsvColor_t)
   EndPointOnOffCB _onChangeOnOffCB = NULL;
   EndPointRGBColorCB _onChangeColorCB = NULL;
   EndPointCB _onChangeCB = NULL;

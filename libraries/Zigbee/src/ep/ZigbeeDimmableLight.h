@@ -1,10 +1,24 @@
+// Copyright 2025 Espressif Systems (Shanghai) PTE LTD
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 /* Class of Zigbee On/Off Light endpoint inherited from common EP class */
 
 #pragma once
 
 #include "soc/soc_caps.h"
 #include "sdkconfig.h"
-#if SOC_IEEE802154_SUPPORTED && CONFIG_ZB_ENABLED
+#if CONFIG_ZB_ENABLED
 
 #include "ZigbeeEP.h"
 #include "ha/esp_zigbee_ha_standard.h"
@@ -76,9 +90,9 @@ public:
     lightChanged();
   }
 
-  void setLightState(bool state);
-  void setLightLevel(uint8_t level);
-  void setLight(bool state, uint8_t level);
+  bool setLightState(bool state);
+  bool setLightLevel(uint8_t level);
+  bool setLight(bool state, uint8_t level);
 
   bool getLightState() {
     return _current_state;
@@ -89,7 +103,6 @@ public:
 
 private:
   void zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *message) override;
-
   void lightChanged();
   // callback function to be called on light change (State, Level)
   void (*_on_light_change)(bool, uint8_t);

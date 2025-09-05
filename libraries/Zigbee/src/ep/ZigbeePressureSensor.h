@@ -1,10 +1,24 @@
+// Copyright 2025 Espressif Systems (Shanghai) PTE LTD
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 /* Class of Zigbee Pressure sensor endpoint inherited from common EP class */
 
 #pragma once
 
 #include "soc/soc_caps.h"
 #include "sdkconfig.h"
-#if SOC_IEEE802154_SUPPORTED && CONFIG_ZB_ENABLED
+#if CONFIG_ZB_ENABLED
 
 #include "ZigbeeEP.h"
 #include "ha/esp_zigbee_ha_standard.h"
@@ -24,8 +38,8 @@
         .pressure_meas_cfg =                                                                        \
             {                                                                                       \
                 .measured_value = ESP_ZB_ZCL_ATTR_PRESSURE_MEASUREMENT_VALUE_DEFAULT_VALUE,         \
-                .min_value = ESP_ZB_ZCL_PATTR_RESSURE_MEASUREMENT_MIN_VALUE_DEFAULT_VALUE,          \
-                .max_value = ESP_ZB_ZCL_PATTR_RESSURE_MEASUREMENT_MAX_VALUE_DEFAULT_VALUE,          \
+                .min_value = ESP_ZB_ZCL_ATTR_PRESSURE_MEASUREMENT_MIN_VALUE_DEFAULT_VALUE,          \
+                .max_value = ESP_ZB_ZCL_ATTR_PRESSURE_MEASUREMENT_MAX_VALUE_DEFAULT_VALUE,          \
             },                                                                                      \
     }
 // clang-format on
@@ -42,19 +56,19 @@ public:
   ~ZigbeePressureSensor() {}
 
   // Set the pressure value in 1 hPa
-  void setPressure(int16_t value);
+  bool setPressure(int16_t value);
 
   // Set the min and max value for the pressure sensor in 1 hPa
-  void setMinMaxValue(int16_t min, int16_t max);
+  bool setMinMaxValue(int16_t min, int16_t max);
 
   // Set the tolerance value for the pressure sensor in 1 hPa
-  void setTolerance(uint16_t tolerance);
+  bool setTolerance(uint16_t tolerance);
 
   // Set the reporting interval for pressure measurement in seconds and delta (pressure change in 1 hPa)
-  void setReporting(uint16_t min_interval, uint16_t max_interval, uint16_t delta);
+  bool setReporting(uint16_t min_interval, uint16_t max_interval, uint16_t delta);
 
   // Report the pressure value
-  void report();
+  bool report();
 };
 
-#endif  //SOC_IEEE802154_SUPPORTED && CONFIG_ZB_ENABLED
+#endif  // CONFIG_ZB_ENABLED

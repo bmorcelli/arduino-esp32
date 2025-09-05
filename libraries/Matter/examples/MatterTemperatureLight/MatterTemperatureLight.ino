@@ -1,4 +1,4 @@
-// Copyright 2024 Espressif Systems (Shanghai) PTE LTD
+// Copyright 2025 Espressif Systems (Shanghai) PTE LTD
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,16 +14,22 @@
 
 // Matter Manager
 #include <Matter.h>
+#if !CONFIG_ENABLE_CHIPOBLE
+// if the device can be commissioned using BLE, WiFi is not used - save flash space
 #include <WiFi.h>
+#endif
 #include <Preferences.h>
 
 // List of Matter Endpoints for this Node
 // Color Temperature CW/WW Light Endpoint
 MatterColorTemperatureLight CW_WW_Light;
 
+// CONFIG_ENABLE_CHIPOBLE is enabled when BLE is used to commission the Matter Network
+#if !CONFIG_ENABLE_CHIPOBLE
 // WiFi is manually set and started
 const char *ssid = "your-ssid";          // Change this to your WiFi SSID
 const char *password = "your-password";  // Change this to your WiFi password
+#endif
 
 // it will keep last OnOff & Brightness state stored, using Preferences
 Preferences matterPref;
@@ -66,6 +72,10 @@ bool setLightState(bool state, uint8_t brightness, uint16_t temperature_Mireds) 
     analogWrite(ledPin, brightness);
 #endif
   } else {
+#ifndef RGB_BUILTIN
+    // after analogWrite(), it is necessary to set the GPIO to digital mode first
+    pinMode(ledPin, OUTPUT);
+#endif
     digitalWrite(ledPin, LOW);
   }
   // store last Brightness and OnOff state for when the Light is restarted / power goes off
@@ -84,6 +94,8 @@ void setup() {
 
   Serial.begin(115200);
 
+// CONFIG_ENABLE_CHIPOBLE is enabled when BLE is used to commission the Matter Network
+#if !CONFIG_ENABLE_CHIPOBLE
   // We start by connecting to a WiFi network
   Serial.print("Connecting to ");
   Serial.println(ssid);
@@ -98,6 +110,7 @@ void setup() {
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
   delay(500);
+#endif
 
   // Initialize Matter EndPoint
   matterPref.begin("MatterPrefs", false);
@@ -129,7 +142,7 @@ void setup() {
   Matter.begin();
   // This may be a restart of a already commissioned Matter accessory
   if (Matter.isDeviceCommissioned()) {
-    Serial.println("Matter Node is commissioned and connected to Wi-Fi. Ready for use.");
+    Serial.println("Matter Node is commissioned and connected to the network. Ready for use.");
     Serial.printf(
       "Initial state: %s | brightness: %d | Color Temperature: %d mireds \r\n", CW_WW_Light ? "ON" : "OFF", CW_WW_Light.getBrightness(),
       CW_WW_Light.getColorTemperature()
@@ -162,7 +175,7 @@ void loop() {
     );
     // configure the Light based on initial on-off state and brightness
     CW_WW_Light.updateAccessory();
-    Serial.println("Matter Node is commissioned and connected to Wi-Fi. Ready for use.");
+    Serial.println("Matter Node is commissioned and connected to the network. Ready for use.");
   }
 
   // A button is also used to control the light

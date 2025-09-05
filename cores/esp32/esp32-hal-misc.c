@@ -25,12 +25,13 @@
 #include "esp_ota_ops.h"
 #endif  //CONFIG_APP_ROLLBACK_ENABLE
 #include "esp_private/startup_internal.h"
-#ifdef CONFIG_BT_ENABLED
+#if (defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)) && SOC_BT_SUPPORTED && __has_include("esp_bt.h")
 #include "esp_bt.h"
-#endif  //CONFIG_BT_ENABLED
+#endif
 #include <sys/time.h>
 #include "soc/rtc.h"
-#if !defined(CONFIG_IDF_TARGET_ESP32C2) && !defined(CONFIG_IDF_TARGET_ESP32C6) && !defined(CONFIG_IDF_TARGET_ESP32H2) && !defined(CONFIG_IDF_TARGET_ESP32P4)
+#if !defined(CONFIG_IDF_TARGET_ESP32C2) && !defined(CONFIG_IDF_TARGET_ESP32C6) && !defined(CONFIG_IDF_TARGET_ESP32H2) && !defined(CONFIG_IDF_TARGET_ESP32P4) \
+  && !defined(CONFIG_IDF_TARGET_ESP32C5)
 #include "soc/rtc_cntl_reg.h"
 #include "soc/syscon_reg.h"
 #endif
@@ -56,6 +57,8 @@
 #include "esp32h2/rom/rtc.h"
 #elif CONFIG_IDF_TARGET_ESP32P4
 #include "esp32p4/rom/rtc.h"
+#elif CONFIG_IDF_TARGET_ESP32C5
+#include "esp32c5/rom/rtc.h"
 
 #else
 #error Target CONFIG_IDF_TARGET is not supported
@@ -156,11 +159,13 @@ void enableCore0WDT() {
   }
 }
 
-void disableCore0WDT() {
+bool disableCore0WDT() {
   TaskHandle_t idle_0 = xTaskGetIdleTaskHandleForCore(0);
-  if (idle_0 == NULL || esp_task_wdt_delete(idle_0) != ESP_OK) {
+  if (idle_0 == NULL || esp_task_wdt_status(idle_0) || esp_task_wdt_delete(idle_0) != ESP_OK) {
     log_e("Failed to remove Core 0 IDLE task from WDT");
+    return false;
   }
+  return true;
 }
 
 #ifndef CONFIG_FREERTOS_UNICORE
@@ -171,11 +176,13 @@ void enableCore1WDT() {
   }
 }
 
-void disableCore1WDT() {
+bool disableCore1WDT() {
   TaskHandle_t idle_1 = xTaskGetIdleTaskHandleForCore(1);
-  if (idle_1 == NULL || esp_task_wdt_delete(idle_1) != ESP_OK) {
+  if (idle_1 == NULL || esp_task_wdt_status(idle_1) || esp_task_wdt_delete(idle_1) != ESP_OK) {
     log_e("Failed to remove Core 1 IDLE task from WDT");
+    return false;
   }
+  return true;
 }
 #endif
 
@@ -239,7 +246,7 @@ bool verifyRollbackLater() {
 }
 #endif
 
-#ifdef CONFIG_BT_ENABLED
+#if defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)
 #if CONFIG_IDF_TARGET_ESP32
 //overwritten in esp32-hal-bt.c
 bool btInUse() __attribute__((weak));
@@ -301,7 +308,7 @@ void initArduino() {
   if (err) {
     log_e("Failed to initialize NVS! Error: %u", err);
   }
-#ifdef CONFIG_BT_ENABLED
+#if (defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)) && SOC_BT_SUPPORTED && __has_include("esp_bt.h")
   if (!btInUse()) {
     esp_bt_controller_mem_release(ESP_BT_MODE_BTDM);
   }

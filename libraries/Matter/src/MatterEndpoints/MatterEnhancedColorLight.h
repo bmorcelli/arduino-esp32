@@ -1,4 +1,4 @@
-// Copyright 2024 Espressif Systems (Shanghai) PTE LTD
+// Copyright 2025 Espressif Systems (Shanghai) PTE LTD
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -91,7 +91,7 @@ protected:
   bool started = false;
   bool onOffState = false;             // default initial state is off, but it can be changed by begin(bool)
   uint8_t brightnessLevel = 0;         // default initial brightness is 0, but it can be changed by begin(bool, uint8_t)
-  espHsvColor_t colorHSV = {0};        // default initial color HSV is black, but it can be changed by begin(bool, uint8_t, espHsvColor_t)
+  espHsvColor_t colorHSV = {0, 0, 0};  // default initial color HSV is black, but it can be changed by begin(bool, uint8_t, espHsvColor_t)
   uint16_t colorTemperatureLevel = 0;  // default initial color temperature is 0, but it can be changed by begin(bool, uint8_t, espHsvColor_t, uint16_t)
   EndPointOnOffCB _onChangeOnOffCB = NULL;
   EndPointBrightnessCB _onChangeBrightnessCB = NULL;

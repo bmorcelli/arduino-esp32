@@ -81,7 +81,7 @@ void NetworkInterface::_onIpEvent(int32_t event_id, void *event_data) {
     );
 #endif
     memcpy(&arduino_event.event_info.got_ip, event_data, sizeof(ip_event_got_ip_t));
-#if SOC_WIFI_SUPPORTED
+#if SOC_WIFI_SUPPORTED || CONFIG_ESP_WIFI_REMOTE_ENABLED
     if (_interface_id == ESP_NETIF_ID_STA) {
       arduino_event.event_id = ARDUINO_EVENT_WIFI_STA_GOT_IP;
     } else
@@ -96,7 +96,7 @@ void NetworkInterface::_onIpEvent(int32_t event_id, void *event_data) {
 #if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_VERBOSE
     log_v("%s Lost IP", desc());
 #endif
-#if SOC_WIFI_SUPPORTED
+#if SOC_WIFI_SUPPORTED || CONFIG_ESP_WIFI_REMOTE_ENABLED
     if (_interface_id == ESP_NETIF_ID_STA) {
       arduino_event.event_id = ARDUINO_EVENT_WIFI_STA_LOST_IP;
     } else
@@ -123,7 +123,7 @@ void NetworkInterface::_onIpEvent(int32_t event_id, void *event_data) {
     );
 #endif
     memcpy(&arduino_event.event_info.got_ip6, event_data, sizeof(ip_event_got_ip6_t));
-#if SOC_WIFI_SUPPORTED
+#if SOC_WIFI_SUPPORTED || CONFIG_ESP_WIFI_REMOTE_ENABLED
     if (_interface_id == ESP_NETIF_ID_STA) {
       arduino_event.event_id = ARDUINO_EVENT_WIFI_STA_GOT_IP6;
     } else if (_interface_id == ESP_NETIF_ID_AP) {
@@ -136,7 +136,7 @@ void NetworkInterface::_onIpEvent(int32_t event_id, void *event_data) {
       arduino_event.event_id = ARDUINO_EVENT_ETH_GOT_IP6;
     }
 #endif /* CONFIG_LWIP_IPV6 */
-#if SOC_WIFI_SUPPORTED
+#if SOC_WIFI_SUPPORTED || CONFIG_ESP_WIFI_REMOTE_ENABLED
   } else if (event_id == IP_EVENT_AP_STAIPASSIGNED && _interface_id == ESP_NETIF_ID_AP) {
     setStatusBits(ESP_NETIF_HAS_IP_BIT);
 #if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_VERBOSE
@@ -606,13 +606,33 @@ int NetworkInterface::impl_index() const {
   return esp_netif_get_netif_impl_index(_esp_netif);
 }
 
-int NetworkInterface::route_prio() const {
+/**
+ * Every netif has a parameter named route_prio, you can refer to file esp_netif_defaults.h.
+ * A higher value of route_prio indicates a higher priority.
+ * The active interface with highest priority will be used for default route (gateway).
+ * Defaults are: STA=100, BR=70, ETH=50, PPP=20, AP/NAN=10
+ */
+int NetworkInterface::getRoutePrio() const {
   if (_esp_netif == NULL) {
     return -1;
   }
   return esp_netif_get_route_prio(_esp_netif);
 }
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 0)
+int NetworkInterface::setRoutePrio(int prio) {
+  if (_esp_netif == NULL) {
+    return -1;
+  }
+  return esp_netif_set_route_prio(_esp_netif, prio);
+}
+#endif
+
+/**
+ * This API overrides the automatic configuration of the default interface based on the route_prio
+ * If the selected netif is set default using this API, no other interface could be set-default disregarding
+ * its route_prio number (unless the selected netif gets destroyed)
+ */
 bool NetworkInterface::setDefault() {
   if (_esp_netif == NULL) {
     return false;
@@ -819,7 +839,11 @@ size_t NetworkInterface::printTo(Print &out) const {
   if (flags & ESP_NETIF_FLAG_MLDV6_REPORT) {
     bytes += out.print(",V6_REP");
   }
-  bytes += out.println(")");
+  bytes += out.print(")");
+
+  bytes += out.print(" PRIO: ");
+  bytes += out.print(getRoutePrio());
+  bytes += out.println("");
 
   bytes += out.print("      ");
   bytes += out.print("ether ");

@@ -15,6 +15,9 @@ Before Contributing
 
 Before sending us a Pull Request, please consider this:
 
+* All contributions must be written in English to ensure effective communication and support.
+  Pull Requests written in other languages will be closed, with a request to rewrite them in English.
+
 * Is the contribution entirely your own work, or is it already licensed under an LGPL 2.1 compatible Open Source License?
   If not, cannot accept it.
 
@@ -219,7 +222,7 @@ Documentation
 -------------
 
 If you are contributing to the documentation, please follow the instructions described in the
-`documentation guidelines <guides/docs_contributing>`_ to properly format and test your changes.
+`documentation guidelines <guides/docs_contributing.html>`_ to properly format and test your changes.
 
 Testing and CI
 --------------
@@ -318,7 +321,7 @@ ESP32-C3 target, you would run:
 
     ./.github/scripts/tests_build.sh -s uart -t esp32c3
 
-You should see the output of the build process and the test binary should be generated in the ``~/.arduino/tests/<test_name>/build.tmp`` folder.
+You should see the output of the build process and the test binary should be generated in the ``~/.arduino/tests/<target_chip>/<test_name>/build.tmp`` folder.
 
 Now that the test is built, you can run it in the target board. Connect the target board to your computer and run:
 
@@ -339,7 +342,7 @@ The test will run on the target board and you should see the output of the test 
     lucassvaz@Lucas--MacBook-Pro esp32 % ./.github/scripts/tests_run.sh -s uart -t esp32c3
     Sketch uart test type: validation
     Running test: uart -- Config: Default
-    pytest tests --build-dir /Users/lucassvaz/.arduino/tests/uart/build.tmp -k test_uart --junit-xml=/Users/lucassvaz/Espressif/Arduino/hardware/espressif/esp32/tests/validation/uart/esp32c3/uart.xml --embedded-services esp,arduino
+    pytest tests --build-dir /Users/lucassvaz/.arduino/tests/esp32c3/uart/build.tmp -k test_uart --junit-xml=/Users/lucassvaz/Espressif/Arduino/hardware/espressif/esp32/tests/validation/uart/esp32c3/uart.xml --embedded-services esp,arduino
     =============================================================================================== test session starts ================================================================================================
     platform darwin -- Python 3.12.3, pytest-8.2.2, pluggy-1.5.0
     rootdir: /Users/lucassvaz/Espressif/Arduino/hardware/espressif/esp32/tests
@@ -422,6 +425,10 @@ The ``ci.json`` file is used to specify how the test suite and sketches will han
 * ``fqbn``: A dictionary that specifies the FQBNs that will be used to compile the sketch. The key is the target name and the value is a list
   of FQBNs. The `default FQBNs <https://github.com/espressif/arduino-esp32/blob/a31a5fca1739993173caba995f7785b8eed6b30e/.github/scripts/sketch_utils.sh#L86-L91>`_
   are used if this field is not specified. This overrides the default FQBNs and the ``fqbn_append`` field.
+* ``libs``: A list of libraries that are required to run the test suite. The libraries will be installed automatically if they are not already present.
+  Libraries are installed using the ``arduino-cli lib install`` command, so you can specify libraries by name + version (e.g., ``AudioZero@1.0.0``)
+  or by URL (e.g., ``https://github.com/arduino-libraries/WiFi101.git``).
+  More information can be found in the `Arduino CLI documentation <https://arduino.github.io/arduino-cli/1.3/commands/arduino-cli_lib_install/>`_.
 
 The ``wifi`` test suite is a good example of how to use the ``ci.json`` file:
 
@@ -432,7 +439,7 @@ Documentation Checks
 ^^^^^^^^^^^^^^^^^^^^
 
 The CI also checks the documentation for any compilation errors. This is important to ensure that the documentation layout is not broken.
-To build the documentation locally, please refer to the `documentation guidelines <guides/docs_contributing>`_.
+To build the documentation locally, please refer to the `documentation guidelines <guides/docs_contributing.html>`_.
 
 Code Style Checks
 ^^^^^^^^^^^^^^^^^

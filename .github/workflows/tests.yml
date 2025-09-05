@@ -16,26 +16,27 @@ on:
   pull_request:
     types: [opened, reopened, closed, synchronize, labeled, unlabeled]
     paths:
+      - ".github/scripts/install*.sh"
       - ".github/workflows/tests*"
-      - ".github/scripts/*.sh"
-      - "!.github/scripts/check-cmakelists.sh"
-      - "!.github/scripts/find_*"
-      - "!.github/scripts/on-*.sh"
-      - "!.github/scripts/set_push_chunks.sh"
-      - "!.github/scripts/update-version.sh"
-      - "!.github/scripts/upload_py_tools.sh"
+      - ".github/scripts/sketch_utils.sh"
       - "tests/**"
       - "cores/**"
       - "libraries/*/src/**.cpp"
       - "libraries/*/src/**.h"
       - "libraries/*/src/**.c"
       - "package/**"
+      - "!*.md"
+      - "!*.properties"
   schedule:
-    - cron: "0 2 * * *"
+    - cron: "0 0 * * *"
 
 concurrency:
   group: tests-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
   push-event-file:
@@ -43,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: event_file
           path: ${{ github.event_path }}
@@ -62,7 +63,7 @@ jobs:
       PERFORMANCE_ENABLED: ${{ contains(github.event.pull_request.labels.*.name, 'perf_test') }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           sparse-checkout: .github/scripts/tests_matrix.sh
 
@@ -71,7 +72,7 @@ jobs:
         run: bash .github/scripts/tests_matrix.sh
 
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: matrix_info
           path: info/*
