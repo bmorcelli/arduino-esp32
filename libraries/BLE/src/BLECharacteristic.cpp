@@ -10,9 +10,8 @@
  */
 
 #include "soc/soc_caps.h"
-#if SOC_BLE_SUPPORTED
-
 #include "sdkconfig.h"
+#if defined(SOC_BLE_SUPPORTED) || defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
 #if defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)
 
 /***************************************************************************
@@ -923,7 +922,6 @@ int BLECharacteristic::handleGATTServerEvent(uint16_t conn_handle, uint16_t attr
         if (ctxt->om->om_pkthdr_len > 8) {
           rc = ble_gap_conn_find(conn_handle, &desc);
           assert(rc == 0);
-          pCharacteristic->m_pCallbacks->onRead(pCharacteristic);
           pCharacteristic->m_pCallbacks->onRead(pCharacteristic, &desc);
         }
 
@@ -957,7 +955,6 @@ int BLECharacteristic::handleGATTServerEvent(uint16_t conn_handle, uint16_t attr
         rc = ble_gap_conn_find(conn_handle, &desc);
         assert(rc == 0);
         pCharacteristic->setValue(buf, len);
-        pCharacteristic->m_pCallbacks->onWrite(pCharacteristic);
         pCharacteristic->m_pCallbacks->onWrite(pCharacteristic, &desc);
 
         return 0;
@@ -1172,4 +1169,4 @@ void BLECharacteristicCallbacks::onSubscribe(BLECharacteristic *pCharacteristic,
 #endif /* CONFIG_NIMBLE_ENABLED */
 
 #endif /* CONFIG_BLUEDROID_ENABLED || CONFIG_NIMBLE_ENABLED */
-#endif /* SOC_BLE_SUPPORTED */
+#endif /* SOC_BLE_SUPPORTED || CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE */

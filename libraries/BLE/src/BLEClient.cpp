@@ -10,9 +10,8 @@
  */
 
 #include "soc/soc_caps.h"
-#if SOC_BLE_SUPPORTED
-
 #include "sdkconfig.h"
+#if defined(SOC_BLE_SUPPORTED) || defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
 #if defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)
 
 /***************************************************************************
@@ -20,7 +19,9 @@
  ***************************************************************************/
 
 #include "Arduino.h"
+#if SOC_BLE_SUPPORTED
 #include <esp_bt.h>
+#endif
 #include "BLEClient.h"
 #include "BLEUtils.h"
 #include "BLEService.h"
@@ -536,6 +537,8 @@ void BLEClient::gattClientEventHandler(esp_gattc_cb_event_t event, esp_gatt_if_t
       m_semaphoreRssiCmplEvt.give();
       m_semaphoreSearchCmplEvt.give(1);
       BLEDevice::removePeerDevice(m_appId, true);
+      // Reset security state on disconnect
+      BLESecurity::resetSecurity();
       if (m_wasConnected && m_pClientCallbacks != nullptr) {
         m_pClientCallbacks->onDisconnect(this);
       }
@@ -981,6 +984,8 @@ int BLEClient::handleGAPEvent(struct ble_gap_event *event, void *arg) {
 
       BLEDevice::removePeerDevice(client->m_appId, true);
       client->m_isConnected = false;
+      // Reset security state on disconnect
+      BLESecurity::resetSecurity();
       if (client->m_pClientCallbacks != nullptr) {
         client->m_pClientCallbacks->onDisconnect(client);
       }
@@ -1298,4 +1303,4 @@ bool BLEClientCallbacks::onConnParamsUpdateRequest(BLEClient *pClient, const ble
 #endif  // CONFIG_NIMBLE_ENABLED
 
 #endif /* CONFIG_BLUEDROID_ENABLED || CONFIG_NIMBLE_ENABLED */
-#endif /* SOC_BLE_SUPPORTED */
+#endif /* SOC_BLE_SUPPORTED || CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE */
