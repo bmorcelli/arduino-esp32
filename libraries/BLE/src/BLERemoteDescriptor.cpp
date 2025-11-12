@@ -10,9 +10,8 @@
  */
 
 #include "soc/soc_caps.h"
-#if SOC_BLE_SUPPORTED
-
 #include "sdkconfig.h"
+#if defined(SOC_BLE_SUPPORTED) || defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
 #if defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)
 
 /***************************************************************************
@@ -313,7 +312,7 @@ String BLERemoteDescriptor::readValue() {
       case BLE_HS_ATT_ERR(BLE_ATT_ERR_INSUFFICIENT_AUTHEN):
       case BLE_HS_ATT_ERR(BLE_ATT_ERR_INSUFFICIENT_AUTHOR):
       case BLE_HS_ATT_ERR(BLE_ATT_ERR_INSUFFICIENT_ENC):
-        if (retryCount && pClient->secureConnection()) {
+        if (BLESecurity::m_securityEnabled && retryCount && pClient->secureConnection()) {
           break;
         }
       /* Else falls through. */
@@ -459,7 +458,7 @@ bool BLERemoteDescriptor::writeValue(uint8_t *data, size_t length, bool response
       case BLE_HS_ATT_ERR(BLE_ATT_ERR_INSUFFICIENT_AUTHEN):
       case BLE_HS_ATT_ERR(BLE_ATT_ERR_INSUFFICIENT_AUTHOR):
       case BLE_HS_ATT_ERR(BLE_ATT_ERR_INSUFFICIENT_ENC):
-        if (retryCount && pClient->secureConnection()) {
+        if (BLESecurity::m_securityEnabled && retryCount && pClient->secureConnection()) {
           break;
         }
       /* Else falls through. */
@@ -480,4 +479,4 @@ exit:
 #endif
 
 #endif /* CONFIG_BLUEDROID_ENABLED || CONFIG_NIMBLE_ENABLED */
-#endif /* SOC_BLE_SUPPORTED */
+#endif /* SOC_BLE_SUPPORTED || CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE */

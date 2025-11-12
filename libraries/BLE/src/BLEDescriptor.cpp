@@ -10,9 +10,8 @@
  */
 
 #include "soc/soc_caps.h"
-#if SOC_BLE_SUPPORTED
-
 #include "sdkconfig.h"
+#if defined(SOC_BLE_SUPPORTED) || defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
 #if defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)
 
 /***************************************************************************
@@ -109,7 +108,7 @@ void BLEDescriptor::executeCreate(BLECharacteristic *pCharacteristic) {
  * @brief Get the BLE handle for this descriptor.
  * @return The handle for this descriptor.
  */
-uint16_t BLEDescriptor::getHandle() {
+uint16_t BLEDescriptor::getHandle() const {
   return m_handle;
 }  // getHandle
 
@@ -117,14 +116,14 @@ uint16_t BLEDescriptor::getHandle() {
  * @brief Get the length of the value of this descriptor.
  * @return The length (in bytes) of the value of this descriptor.
  */
-size_t BLEDescriptor::getLength() {
+size_t BLEDescriptor::getLength() const {
   return m_value.attr_len;
 }  // getLength
 
 /**
  * @brief Get the UUID of the descriptor.
  */
-BLEUUID BLEDescriptor::getUUID() {
+BLEUUID BLEDescriptor::getUUID() const {
   return m_bleUUID;
 }  // getUUID
 
@@ -132,7 +131,7 @@ BLEUUID BLEDescriptor::getUUID() {
  * @brief Get the value of this descriptor.
  * @return A pointer to the value of this descriptor.
  */
-uint8_t *BLEDescriptor::getValue() {
+uint8_t *BLEDescriptor::getValue() const {
   return m_value.attr_value;
 }  // getValue
 
@@ -140,7 +139,7 @@ uint8_t *BLEDescriptor::getValue() {
  * @brief Get the characteristic this descriptor belongs to.
  * @return A pointer to the characteristic this descriptor belongs to.
  */
-BLECharacteristic *BLEDescriptor::getCharacteristic() {
+BLECharacteristic *BLEDescriptor::getCharacteristic() const {
   return m_pCharacteristic;
 }  // getCharacteristic
 
@@ -181,7 +180,7 @@ void BLEDescriptor::setHandle(uint16_t handle) {
  * @param [in] data The data to set for the descriptor.
  * @param [in] length The length of the data in bytes.
  */
-void BLEDescriptor::setValue(uint8_t *data, size_t length) {
+void BLEDescriptor::setValue(const uint8_t *data, size_t length) {
   if (length > m_value.attr_max_len) {
     log_e("Size %d too large, must be no bigger than %d", length, m_value.attr_max_len);
     return;
@@ -203,11 +202,11 @@ void BLEDescriptor::setValue(uint8_t *data, size_t length) {
  * @brief Set the value of the descriptor.
  * @param [in] value The value of the descriptor in string form.
  */
-void BLEDescriptor::setValue(String value) {
-  setValue((uint8_t *)value.c_str(), value.length());
+void BLEDescriptor::setValue(const String &value) {
+  setValue(reinterpret_cast<const uint8_t *>(value.c_str()), value.length());
 }  // setValue
 
-void BLEDescriptor::setAccessPermissions(uint8_t perm) {
+void BLEDescriptor::setAccessPermissions(uint16_t perm) {
   m_permissions = perm;
 }
 
@@ -215,14 +214,14 @@ void BLEDescriptor::setAccessPermissions(uint8_t perm) {
  * @brief Return a string representation of the descriptor.
  * @return A string representation of the descriptor.
  */
-String BLEDescriptor::toString() {
+String BLEDescriptor::toString() const {
   char hex[5];
   snprintf(hex, sizeof(hex), "%04x", m_handle);
   String res = "UUID: " + m_bleUUID.toString() + ", handle: 0x" + hex;
   return res;
 }  // toString
 
-BLEDescriptorCallbacks::~BLEDescriptorCallbacks() {}
+BLEDescriptorCallbacks::~BLEDescriptorCallbacks() = default;
 
 /**
  * @brief Callback function to support a read request.
@@ -406,4 +405,4 @@ int BLEDescriptor::handleGATTServerEvent(uint16_t conn_handle, uint16_t attr_han
 #endif
 
 #endif /* CONFIG_BLUEDROID_ENABLED || CONFIG_NIMBLE_ENABLED */
-#endif /* SOC_BLE_SUPPORTED */
+#endif /* SOC_BLE_SUPPORTED || CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE */

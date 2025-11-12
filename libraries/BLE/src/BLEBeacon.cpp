@@ -10,9 +10,8 @@
  */
 
 #include "soc/soc_caps.h"
-#if SOC_BLE_SUPPORTED
-
 #include "sdkconfig.h"
+#if defined(SOC_BLE_SUPPORTED) || defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
 #if defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)
 
 /***************************************************************************
@@ -62,7 +61,7 @@ int8_t BLEBeacon::getSignalPower() {
   return m_beaconData.signalPower;
 }
 
-void BLEBeacon::setData(String data) {
+void BLEBeacon::setData(const String &data) {
   if (data.length() != sizeof(m_beaconData)) {
     log_e("Unable to set the data ... length passed in was %d and expected %d", data.length(), sizeof(m_beaconData));
     return;
@@ -96,4 +95,4 @@ void BLEBeacon::setProximityUUID(BLEUUID uuid) {
 }
 
 #endif /* CONFIG_BLUEDROID_ENABLED || CONFIG_NIMBLE_ENABLED */
-#endif /* SOC_BLE_SUPPORTED */
+#endif /* SOC_BLE_SUPPORTED || CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE */

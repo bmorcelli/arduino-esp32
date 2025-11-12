@@ -16,9 +16,8 @@
 */
 
 #include "soc/soc_caps.h"
-#if SOC_BLE_SUPPORTED
-
 #include "sdkconfig.h"
+#if defined(SOC_BLE_SUPPORTED) || defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
 #if defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)
 
 /***************************************************************************
@@ -47,7 +46,7 @@ BLE2901::BLE2901() : BLEDescriptor(BLEUUID((uint16_t)BLE2901_UUID)) {}
 /**
  * @brief Set the Characteristic User Description
  */
-void BLE2901::setDescription(String userDesc) {
+void BLE2901::setDescription(const String &userDesc) {
   if (userDesc.length() > ESP_GATT_MAX_ATTR_LEN) {
     log_e("Size %d too large, must be no bigger than %d", userDesc.length(), ESP_GATT_MAX_ATTR_LEN);
     return;
@@ -56,4 +55,4 @@ void BLE2901::setDescription(String userDesc) {
 }
 
 #endif /* CONFIG_BLUEDROID_ENABLED || CONFIG_NIMBLE_ENABLED */
-#endif /* SOC_BLE_SUPPORTED */
+#endif /* SOC_BLE_SUPPORTED || CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE */

@@ -10,9 +10,8 @@
  */
 
 #include "soc/soc_caps.h"
-#if SOC_BLE_SUPPORTED
-
 #include "sdkconfig.h"
+#if defined(SOC_BLE_SUPPORTED) || defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
 #if defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)
 
 /***************************************************************************
@@ -124,7 +123,7 @@ void BLECharacteristic::addDescriptor(BLEDescriptor *pDescriptor) {
  * @param [in] descriptorUUID The UUID of the descriptor that we wish to retrieve.
  * @return The BLE Descriptor.  If no such descriptor is associated with the characteristic, nullptr is returned.
  */
-BLEDescriptor *BLECharacteristic::getDescriptorByUUID(const char *descriptorUUID) {
+BLEDescriptor *BLECharacteristic::getDescriptorByUUID(const char *descriptorUUID) const {
   return m_descriptorMap.getByUUID(BLEUUID(descriptorUUID));
 }  // getDescriptorByUUID
 
@@ -133,7 +132,7 @@ BLEDescriptor *BLECharacteristic::getDescriptorByUUID(const char *descriptorUUID
  * @param [in] descriptorUUID The UUID of the descriptor that we wish to retrieve.
  * @return The BLE Descriptor.  If no such descriptor is associated with the characteristic, nullptr is returned.
  */
-BLEDescriptor *BLECharacteristic::getDescriptorByUUID(BLEUUID descriptorUUID) {
+BLEDescriptor *BLECharacteristic::getDescriptorByUUID(BLEUUID descriptorUUID) const {
   return m_descriptorMap.getByUUID(descriptorUUID);
 }  // getDescriptorByUUID
 
@@ -141,24 +140,24 @@ BLEDescriptor *BLECharacteristic::getDescriptorByUUID(BLEUUID descriptorUUID) {
  * @brief Get the handle of the characteristic.
  * @return The handle of the characteristic.
  */
-uint16_t BLECharacteristic::getHandle() {
+uint16_t BLECharacteristic::getHandle() const {
   return m_handle;
 }  // getHandle
 
-void BLECharacteristic::setAccessPermissions(uint8_t perm) {
+void BLECharacteristic::setAccessPermissions(uint16_t perm) {
 #ifdef CONFIG_BLUEDROID_ENABLED
   m_permissions = perm;
 #endif
 }
 
-esp_gatt_char_prop_t BLECharacteristic::getProperties() {
+esp_gatt_char_prop_t BLECharacteristic::getProperties() const {
   return m_properties;
 }  // getProperties
 
 /**
  * @brief Get the service associated with this characteristic.
  */
-BLEService *BLECharacteristic::getService() {
+BLEService *BLECharacteristic::getService() const {
   return m_pService;
 }  // getService
 
@@ -166,7 +165,7 @@ BLEService *BLECharacteristic::getService() {
  * @brief Get the UUID of the characteristic.
  * @return The UUID of the characteristic.
  */
-BLEUUID BLECharacteristic::getUUID() {
+BLEUUID BLECharacteristic::getUUID() const {
   return m_bleUUID;
 }  // getUUID
 
@@ -174,7 +173,7 @@ BLEUUID BLECharacteristic::getUUID() {
  * @brief Retrieve the current value of the characteristic.
  * @return A pointer to storage containing the current characteristic value.
  */
-String BLECharacteristic::getValue() {
+String BLECharacteristic::getValue() const {
   return m_value.getValue();
 }  // getValue
 
@@ -190,7 +189,7 @@ uint8_t *BLECharacteristic::getData() {
  * @brief Retrieve the current length of the data of the characteristic.
  * @return Amount of databytes of the characteristic.
  */
-size_t BLECharacteristic::getLength() {
+size_t BLECharacteristic::getLength() const {
   return m_value.getLength();
 }  // getLength
 
@@ -346,7 +345,7 @@ void BLECharacteristic::setReadProperty(bool value) {
  * @param [in] data The data to set for the characteristic.
  * @param [in] length The length of the data in bytes.
  */
-void BLECharacteristic::setValue(uint8_t *data, size_t length) {
+void BLECharacteristic::setValue(const uint8_t *data, size_t length) {
 // The call to BLEUtils::buildHexData() doesn't output anything if the log level is not
 // "VERBOSE". As it is quite CPU intensive, it is much better to not call it if not needed.
 #if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_VERBOSE
@@ -371,43 +370,28 @@ void BLECharacteristic::setValue(uint8_t *data, size_t length) {
  * @param [in] Set the value of the characteristic.
  * @return N/A.
  */
-void BLECharacteristic::setValue(String value) {
-  setValue((uint8_t *)(value.c_str()), value.length());
+void BLECharacteristic::setValue(const String &value) {
+  setValue(reinterpret_cast<const uint8_t *>(value.c_str()), value.length());
 }  // setValue
 
-void BLECharacteristic::setValue(uint16_t &data16) {
-  uint8_t temp[2];
-  temp[0] = data16;
-  temp[1] = data16 >> 8;
-  setValue(temp, 2);
+void BLECharacteristic::setValue(uint16_t data16) {
+  setValue(reinterpret_cast<const uint8_t *>(&data16), sizeof(data16));
 }  // setValue
 
-void BLECharacteristic::setValue(uint32_t &data32) {
-  uint8_t temp[4];
-  temp[0] = data32;
-  temp[1] = data32 >> 8;
-  temp[2] = data32 >> 16;
-  temp[3] = data32 >> 24;
-  setValue(temp, 4);
+void BLECharacteristic::setValue(uint32_t data32) {
+  setValue(reinterpret_cast<const uint8_t *>(&data32), sizeof(data32));
 }  // setValue
 
-void BLECharacteristic::setValue(int &data32) {
-  uint8_t temp[4];
-  temp[0] = data32;
-  temp[1] = data32 >> 8;
-  temp[2] = data32 >> 16;
-  temp[3] = data32 >> 24;
-  setValue(temp, 4);
+void BLECharacteristic::setValue(int data32) {
+  setValue(reinterpret_cast<const uint8_t *>(&data32), sizeof(data32));
 }  // setValue
 
-void BLECharacteristic::setValue(float &data32) {
-  float temp = data32;
-  setValue((uint8_t *)&temp, 4);
+void BLECharacteristic::setValue(float data32) {
+  setValue(reinterpret_cast<const uint8_t *>(&data32), sizeof(data32));
 }  // setValue
 
-void BLECharacteristic::setValue(double &data64) {
-  double temp = data64;
-  setValue((uint8_t *)&temp, 8);
+void BLECharacteristic::setValue(double data64) {
+  setValue(reinterpret_cast<const uint8_t *>(&data64), sizeof(data64));
 }  // setValue
 
 /**
@@ -440,7 +424,7 @@ void BLECharacteristic::setWriteProperty(bool value) {
  * @brief Return a string representation of the characteristic.
  * @return A string representation of the characteristic.
  */
-String BLECharacteristic::toString() {
+String BLECharacteristic::toString() const {
   String res = "UUID: " + m_bleUUID.toString() + ", handle : 0x";
   char hex[5];
   snprintf(hex, sizeof(hex), "%04x", m_handle);
@@ -467,7 +451,7 @@ String BLECharacteristic::toString() {
   return res;
 }  // toString
 
-BLECharacteristicCallbacks::~BLECharacteristicCallbacks() {}
+BLECharacteristicCallbacks::~BLECharacteristicCallbacks() = default;
 
 // Common callbacks
 void BLECharacteristicCallbacks::onRead(BLECharacteristic *pCharacteristic) {
@@ -582,6 +566,32 @@ void BLECharacteristic::handleGATTServerEvent(esp_gatts_cb_event_t event, esp_ga
       // we save the new value.  Next we look at the need_rsp flag which indicates whether or not we need
       // to send a response.  If we do, then we formulate a response and send it.
       if (param->write.handle == m_handle) {
+
+        // Check for authorization requirement
+        if (m_permissions & ESP_GATT_PERM_WRITE_AUTHORIZATION) {
+          bool authorized = false;
+
+          if (BLEDevice::m_securityCallbacks != nullptr) {
+            log_i("Authorization required for write operation. Checking authorization...");
+            authorized = BLEDevice::m_securityCallbacks->onAuthorizationRequest(param->write.conn_id, m_handle, false);
+          } else {
+            log_w("onAuthorizationRequest not implemented. Rejecting write authorization request");
+          }
+
+          if (!authorized) {
+            log_i("Write authorization rejected");
+            if (param->write.need_rsp) {
+              esp_err_t errRc = ::esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, ESP_GATT_INSUF_AUTHORIZATION, nullptr);
+              if (errRc != ESP_OK) {
+                log_e("esp_ble_gatts_send_response (authorization failed): rc=%d %s", errRc, GeneralUtils::errorToString(errRc));
+              }
+            }
+            return;  // Exit early, don't process the write
+          } else {
+            log_i("Write authorization granted");
+          }
+        }
+
         if (param->write.is_prep) {
           m_value.addPart(param->write.value, param->write.len);
           m_writeEvt = true;
@@ -636,6 +646,31 @@ void BLECharacteristic::handleGATTServerEvent(esp_gatts_cb_event_t event, esp_ga
     case ESP_GATTS_READ_EVT:
     {
       if (param->read.handle == m_handle) {
+
+        // Check for authorization requirement
+        if (m_permissions & ESP_GATT_PERM_READ_AUTHORIZATION) {
+          bool authorized = false;
+
+          if (BLEDevice::m_securityCallbacks != nullptr) {
+            log_i("Authorization required for read operation. Checking authorization...");
+            authorized = BLEDevice::m_securityCallbacks->onAuthorizationRequest(param->read.conn_id, m_handle, true);
+          } else {
+            log_w("onAuthorizationRequest not implemented. Rejecting read authorization request");
+          }
+
+          if (!authorized) {
+            log_i("Read authorization rejected");
+            if (param->read.need_rsp) {
+              esp_err_t errRc = ::esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id, ESP_GATT_INSUF_AUTHORIZATION, nullptr);
+              if (errRc != ESP_OK) {
+                log_e("esp_ble_gatts_send_response (authorization failed): rc=%d %s", errRc, GeneralUtils::errorToString(errRc));
+              }
+            }
+            return;  // Exit early, don't process the read
+          } else {
+            log_i("Read authorization granted");
+          }
+        }
 
         // Here's an interesting thing.  The read request has the option of saying whether we need a response
         // or not.  What would it "mean" to receive a read request and NOT send a response back?  That feels like
@@ -869,6 +904,52 @@ void BLECharacteristicCallbacks::onWrite(BLECharacteristic *pCharacteristic, esp
 
 #if defined(CONFIG_NIMBLE_ENABLED)
 
+/**
+ * @brief Process a deferred write callback.
+ *
+ * This function is called as a FreeRTOS task to execute the onWrite callback
+ * after the write response has been sent to the client. This maintains backwards
+ * compatibility with Bluedroid, where the write response is sent before the
+ * onWrite callback is invoked.
+ *
+ * The delay is based on the connection interval to ensure the write response
+ * packet has been transmitted over the air before the callback executes.
+ *
+ * See: https://github.com/espressif/arduino-esp32/issues/11938
+ */
+void BLECharacteristic::processDeferredWriteCallback(void *pvParameters) {
+  DeferredWriteCallback *pCallback = (DeferredWriteCallback *)pvParameters;
+
+  // Get connection parameters to calculate appropriate delay
+  ble_gap_conn_desc desc;
+  int rc = ble_gap_conn_find(pCallback->conn_handle, &desc);
+
+  if (rc == 0) {
+    // Connection interval is in units of 1.25ms
+    // Wait for at least one connection interval to ensure the write response
+    // has been transmitted. Add a small buffer for processing.
+    uint16_t intervalMs = (desc.conn_itvl * 125) / 100;  // Convert to milliseconds
+    uint16_t delayMs = intervalMs + 5;                   // Add 5ms buffer
+
+    log_v("Deferring write callback by %dms (conn_interval=%d units, %dms)", delayMs, desc.conn_itvl, intervalMs);
+    vTaskDelay(pdMS_TO_TICKS(delayMs));
+  } else {
+    // If we can't get connection parameters, use a conservative default
+    // Most connections use 7.5-30ms intervals, so 50ms should be safe
+    log_w("Could not get connection parameters, using default 50ms delay");
+    vTaskDelay(pdMS_TO_TICKS(50));
+  }
+
+  // Call the onWrite callback now that the response has been transmitted
+  pCallback->pCharacteristic->m_pCallbacks->onWrite(pCallback->pCharacteristic, &pCallback->desc);
+
+  // Free the allocated memory
+  delete pCallback;
+
+  // Delete this one-shot task
+  vTaskDelete(NULL);
+}
+
 int BLECharacteristic::handleGATTServerEvent(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
   const ble_uuid_t *uuid;
   int rc;
@@ -887,7 +968,6 @@ int BLECharacteristic::handleGATTServerEvent(uint16_t conn_handle, uint16_t attr
         if (ctxt->om->om_pkthdr_len > 8) {
           rc = ble_gap_conn_find(conn_handle, &desc);
           assert(rc == 0);
-          pCharacteristic->m_pCallbacks->onRead(pCharacteristic);
           pCharacteristic->m_pCallbacks->onRead(pCharacteristic, &desc);
         }
 
@@ -921,8 +1001,28 @@ int BLECharacteristic::handleGATTServerEvent(uint16_t conn_handle, uint16_t attr
         rc = ble_gap_conn_find(conn_handle, &desc);
         assert(rc == 0);
         pCharacteristic->setValue(buf, len);
-        pCharacteristic->m_pCallbacks->onWrite(pCharacteristic);
-        pCharacteristic->m_pCallbacks->onWrite(pCharacteristic, &desc);
+
+        // Defer the onWrite callback to maintain backwards compatibility with Bluedroid.
+        // In Bluedroid, the write response is sent BEFORE the onWrite callback is invoked.
+        // In NimBLE, the response is sent implicitly when this function returns.
+        // By deferring the callback to a separate task with a delay based on the connection
+        // interval, we ensure the response packet is transmitted before the callback executes.
+        // See: https://github.com/espressif/arduino-esp32/issues/11938
+        DeferredWriteCallback *pCallback = new DeferredWriteCallback();
+        pCallback->pCharacteristic = pCharacteristic;
+        pCallback->desc = desc;
+        pCallback->conn_handle = conn_handle;
+
+        // Create a one-shot task to execute the callback after the response is transmitted
+        // Using priority 1 (low priority) and sufficient stack for callback operations
+        // Note: Stack must be large enough to handle notify() calls from within onWrite()
+        xTaskCreate(
+          processDeferredWriteCallback, "BLEWriteCB",
+          4096,  // Stack size - increased to handle notify() operations
+          pCallback,
+          1,    // Priority (low)
+          NULL  // Task handle (not needed for one-shot task)
+        );
 
         return 0;
       }
@@ -1136,4 +1236,4 @@ void BLECharacteristicCallbacks::onSubscribe(BLECharacteristic *pCharacteristic,
 #endif /* CONFIG_NIMBLE_ENABLED */
 
 #endif /* CONFIG_BLUEDROID_ENABLED || CONFIG_NIMBLE_ENABLED */
-#endif /* SOC_BLE_SUPPORTED */
+#endif /* SOC_BLE_SUPPORTED || CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE */

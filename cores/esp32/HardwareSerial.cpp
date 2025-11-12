@@ -136,8 +136,6 @@ HardwareSerial::HardwareSerial(uint8_t uart_nr)
     }
   }
 #endif
-  // set deinit function in the Peripheral Manager
-  uart_init_PeriMan();
 }
 
 HardwareSerial::~HardwareSerial() {
@@ -574,8 +572,20 @@ HardwareSerial::operator bool() const {
   return uartIsDriverInstalled(_uart);
 }
 
-void HardwareSerial::setRxInvert(bool invert) {
-  uartSetRxInvert(_uart, invert);
+bool HardwareSerial::setRxInvert(bool invert) {
+  return uartSetRxInvert(_uart, invert);
+}
+
+bool HardwareSerial::setTxInvert(bool invert) {
+  return uartSetTxInvert(_uart, invert);
+}
+
+bool HardwareSerial::setCtsInvert(bool invert) {
+  return uartSetCtsInvert(_uart, invert);
+}
+
+bool HardwareSerial::setRtsInvert(bool invert) {
+  return uartSetRtsInvert(_uart, invert);
 }
 
 // negative Pin value will keep it unmodified

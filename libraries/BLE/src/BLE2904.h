@@ -13,9 +13,8 @@
 #define COMPONENTS_CPP_UTILS_BLE2904_H_
 
 #include "soc/soc_caps.h"
-#if SOC_BLE_SUPPORTED
-
 #include "sdkconfig.h"
+#if defined(SOC_BLE_SUPPORTED) || defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
 #if defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)
 
 /***************************************************************************
@@ -95,8 +94,6 @@ public:
   void setUnit(uint16_t unit);
 
 private:
-  friend class BLECharacteristic;
-
   /***************************************************************************
    *                         Common private properties                         *
    ***************************************************************************/
@@ -105,5 +102,6 @@ private:
 };  // BLE2904
 
 #endif /* CONFIG_BLUEDROID_ENABLED || CONFIG_NIMBLE_ENABLED */
-#endif /* SOC_BLE_SUPPORTED */
+#endif /* SOC_BLE_SUPPORTED || CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE */
+
 #endif /* COMPONENTS_CPP_UTILS_BLE2904_H_ */

@@ -15,6 +15,27 @@ extern "C" {
 
 #include "lwip/priv/tcpip_priv.h"
 
+#ifndef CONFIG_ARDUINO_UDP_TASK_STACK_SIZE
+#define CONFIG_ARDUINO_UDP_TASK_STACK_SIZE 4096
+#endif
+#ifndef ARDUINO_UDP_TASK_STACK_SIZE
+#define ARDUINO_UDP_TASK_STACK_SIZE CONFIG_ARDUINO_UDP_TASK_STACK_SIZE
+#endif
+
+#ifndef CONFIG_ARDUINO_UDP_TASK_PRIORITY
+#define CONFIG_ARDUINO_UDP_TASK_PRIORITY 3
+#endif
+#ifndef ARDUINO_UDP_TASK_PRIORITY
+#define ARDUINO_UDP_TASK_PRIORITY CONFIG_ARDUINO_UDP_TASK_PRIORITY
+#endif
+
+#ifndef CONFIG_ARDUINO_UDP_RUNNING_CORE
+#define CONFIG_ARDUINO_UDP_RUNNING_CORE -1
+#endif
+#ifndef ARDUINO_UDP_RUNNING_CORE
+#define ARDUINO_UDP_RUNNING_CORE CONFIG_ARDUINO_UDP_RUNNING_CORE
+#endif
+
 #ifdef CONFIG_LWIP_TCPIP_CORE_LOCKING
 #define UDP_MUTEX_LOCK()                                \
   if (!sys_thread_tcpip(LWIP_CORE_LOCK_QUERY_HOLDER)) { \
@@ -164,6 +185,7 @@ static QueueHandle_t _udp_queue;
 static volatile TaskHandle_t _udp_task_handle = NULL;
 
 static void _udp_task(void *pvParameters) {
+  (void)pvParameters;
   lwip_event_packet_t *e = NULL;
   for (;;) {
     if (xQueueReceive(_udp_queue, &e, portMAX_DELAY) == pdTRUE) {
@@ -188,7 +210,7 @@ static bool _udp_task_start() {
   }
   if (!_udp_task_handle) {
     xTaskCreateUniversal(
-      _udp_task, "async_udp", 4096, NULL, CONFIG_ARDUINO_UDP_TASK_PRIORITY, (TaskHandle_t *)&_udp_task_handle, CONFIG_ARDUINO_UDP_RUNNING_CORE
+      _udp_task, "async_udp", ARDUINO_UDP_TASK_STACK_SIZE, NULL, ARDUINO_UDP_TASK_PRIORITY, (TaskHandle_t *)&_udp_task_handle, ARDUINO_UDP_RUNNING_CORE
     );
     if (!_udp_task_handle) {
       return false;
@@ -315,6 +337,33 @@ AsyncUDPPacket::AsyncUDPPacket(AsyncUDPPacket &packet) {
   memcpy(_remoteMac, packet._remoteMac, 6);
 
   pbuf_ref(_pb);
+}
+
+AsyncUDPPacket &AsyncUDPPacket::operator=(const AsyncUDPPacket &packet) {
+  if (this != &packet) {
+    if (_pb) {
+      // Free existing pbuf reference
+      pbuf_free(_pb);
+    }
+
+    // Copy all members
+    _udp = packet._udp;
+    _pb = packet._pb;
+    _if = packet._if;
+    _data = packet._data;
+    _len = packet._len;
+    _index = 0;
+
+    memcpy(&_remoteIp, &packet._remoteIp, sizeof(ip_addr_t));
+    memcpy(&_localIp, &packet._localIp, sizeof(ip_addr_t));
+    _localPort = packet._localPort;
+    _remotePort = packet._remotePort;
+    memcpy(_remoteMac, packet._remoteMac, 6);
+
+    // Increment reference count for the new pbuf
+    pbuf_ref(_pb);
+  }
+  return *this;
 }
 
 AsyncUDPPacket::AsyncUDPPacket(AsyncUDP *udp, pbuf *pb, const ip_addr_t *raddr, uint16_t rport, struct netif *ntif) {

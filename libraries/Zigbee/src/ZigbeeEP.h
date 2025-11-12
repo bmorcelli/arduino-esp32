@@ -1,3 +1,17 @@
+// Copyright 2025 Espressif Systems (Shanghai) PTE LTD
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 /* Common Class for Zigbee End point */
 
 #pragma once
@@ -135,8 +149,11 @@ public:
   // list of all handlers function calls, to be override by EPs implementation
   virtual void zbAttributeSet(const esp_zb_zcl_set_attr_value_message_t *message) {};
   virtual void zbAttributeRead(uint16_t cluster_id, const esp_zb_zcl_attribute_t *attribute, uint8_t src_endpoint, esp_zb_zcl_addr_t src_address) {};
+  virtual void
+    zbWriteAttributeResponse(uint16_t cluster_id, uint16_t attribute_id, esp_zb_zcl_status_t status, uint8_t src_endpoint, esp_zb_zcl_addr_t src_address) {};
   virtual void zbReadBasicCluster(const esp_zb_zcl_attribute_t *attribute);  //already implemented
   virtual void zbIdentify(const esp_zb_zcl_set_attr_value_message_t *message);
+  virtual void zbOTAState(bool otaActive);
   virtual void zbWindowCoveringMovementCmd(const esp_zb_zcl_window_covering_movement_message_t *message) {};
   virtual void zbReadTimeCluster(const esp_zb_zcl_attribute_t *attribute);  //already implemented
   virtual void zbIASZoneStatusChangeNotification(const esp_zb_zcl_ias_zone_status_change_notification_message_t *message) {};
@@ -160,6 +177,10 @@ public:
     _on_identify = callback;
   }
 
+  void onOTAStateChange(void (*callback)(bool state)) {
+    _on_ota_state_change = callback;
+  }
+
   void onDefaultResponse(void (*callback)(zb_cmd_type_t resp_to_cmd, esp_zb_zcl_status_t status)) {
     _on_default_response = callback;
   }
@@ -170,6 +191,7 @@ private:
   char *_read_manufacturer;
   char *_read_model;
   void (*_on_identify)(uint16_t time);
+  void (*_on_ota_state_change)(bool state);
   void (*_on_default_response)(zb_cmd_type_t resp_to_cmd, esp_zb_zcl_status_t status);
   time_t _read_time;
   int32_t _read_timezone;

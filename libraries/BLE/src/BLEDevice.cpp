@@ -10,9 +10,8 @@
  */
 
 #include "soc/soc_caps.h"
-#if SOC_BLE_SUPPORTED
-
 #include "sdkconfig.h"
+#if defined(SOC_BLE_SUPPORTED) || defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
 #if defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)
 
 /***************************************************************************
@@ -24,7 +23,10 @@
 #include <freertos/task.h>
 #include <esp_err.h>
 #include <nvs_flash.h>
+
+#if SOC_BLE_SUPPORTED
 #include <esp_bt.h>
+#endif
 
 #include <esp_err.h>
 #include <map>
@@ -35,6 +37,8 @@
 #include "BLEClient.h"
 #include "BLEUtils.h"
 #include "GeneralUtils.h"
+#include "BLESecurity.h"
+#include "base64.h"
 
 #if defined(ARDUINO_ARCH_ESP32)
 #include "esp32-hal-bt.h"
@@ -74,6 +78,10 @@
 #include "services/gatt/ble_svc_gatt.h"
 #endif
 
+#if defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
+#include "esp32-hal-hosted.h"
+#endif
+
 /***************************************************************************
  *                            Common properties                            *
  ***************************************************************************/
@@ -97,7 +105,6 @@ gap_event_handler BLEDevice::m_customGapHandler = nullptr;
  ***************************************************************************/
 
 #if defined(CONFIG_BLUEDROID_ENABLED)
-esp_ble_sec_act_t BLEDevice::m_securityLevel = (esp_ble_sec_act_t)0;
 gattc_event_handler BLEDevice::m_customGattcHandler = nullptr;
 gatts_event_handler BLEDevice::m_customGattsHandler = nullptr;
 #endif
@@ -236,6 +243,8 @@ String BLEDevice::getValue(BLEAddress bdAddress, BLEUUID serviceUUID, BLEUUID ch
  */
 void BLEDevice::init(String deviceName) {
   if (!initialized) {
+    log_i("Initializing BLE stack: %s", getBLEStackString().c_str());
+
     esp_err_t errRc = ESP_OK;
 #if defined(CONFIG_BLUEDROID_ENABLED)
 #if defined(ARDUINO_ARCH_ESP32)
@@ -339,6 +348,16 @@ void BLEDevice::init(String deviceName) {
 #endif  // CONFIG_BLE_SMP_ENABLE
 #endif  // CONFIG_BLUEDROID_ENABLED
 
+#if defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
+    // Initialize esp-hosted transport for BLE HCI when explicitly enabled
+    if (!hostedInitBLE()) {
+      log_e("Failed to initialize ESP-Hosted for BLE");
+      return;
+    }
+
+    // Hosted HCI driver will be initialized automatically by NimBLE transport layer
+#endif
+
 #if defined(CONFIG_NIMBLE_ENABLED)
     errRc = nimble_port_init();
     if (errRc != ESP_OK) {
@@ -410,10 +429,14 @@ void BLEDevice::init(String deviceName) {
  */
 void BLEDevice::setPower(esp_power_level_t powerLevel, esp_ble_power_type_t powerType) {
   log_v(">> setPower: %d (type: %d)", powerLevel, powerType);
+#if defined(SOC_BLE_SUPPORTED)
   esp_err_t errRc = ::esp_ble_tx_power_set(powerType, powerLevel);
   if (errRc != ESP_OK) {
     log_e("esp_ble_tx_power_set: rc=%d %s", errRc, GeneralUtils::errorToString(errRc));
   };
+#else
+  log_w("setPower not supported with hosted HCI - power controlled by co-processor");
+#endif
   log_v("<< setPower");
 }  // setPower
 
@@ -436,17 +459,22 @@ void BLEDevice::setPower(esp_power_level_t powerLevel, esp_ble_power_type_t powe
  */
 
 int BLEDevice::getPower(esp_ble_power_type_t powerType) {
+#if SOC_BLE_SUPPORTED
   switch (esp_ble_tx_power_get(powerType)) {
     case ESP_PWR_LVL_N12: return -12;
     case ESP_PWR_LVL_N9:  return -9;
     case ESP_PWR_LVL_N6:  return -6;
-    case ESP_PWR_LVL_N3:  return -6;
+    case ESP_PWR_LVL_N3:  return -3;
     case ESP_PWR_LVL_N0:  return 0;
     case ESP_PWR_LVL_P3:  return 3;
     case ESP_PWR_LVL_P6:  return 6;
     case ESP_PWR_LVL_P9:  return 9;
     default:              return -128;
   }
+#else
+  log_w("getPower not supported with hosted HCI - power controlled by co-processor");
+  return 0;  // Return default power level
+#endif
 }  // getPower
 
 /**
@@ -581,6 +609,181 @@ bool BLEDevice::getInitialized() {
   return initialized;
 }
 
+/*
+ * @brief Get a peer device's Identity Resolving Key (IRK).
+ * @param [in] peerAddress The address of the bonded peer device.
+ * @param [out] irk Buffer to store the 16-byte IRK.
+ * @return True if successful, false otherwise.
+ * @note IRK is only available after bonding has occurred.
+ */
+bool BLEDevice::getPeerIRK(BLEAddress peerAddress, uint8_t *irk) {
+  log_v(">> BLEDevice::getPeerIRK()");
+
+  if (irk == nullptr) {
+    log_e("IRK buffer is null");
+    return false;
+  }
+
+#if defined(CONFIG_BLUEDROID_ENABLED)
+  // Get the list of bonded devices
+  int dev_num = esp_ble_get_bond_device_num();
+  if (dev_num == 0) {
+    log_e("No bonded devices found");
+    return false;
+  }
+
+  esp_ble_bond_dev_t *bond_dev = (esp_ble_bond_dev_t *)malloc(sizeof(esp_ble_bond_dev_t) * dev_num);
+  if (bond_dev == nullptr) {
+    log_e("Failed to allocate memory for bond device list");
+    return false;
+  }
+
+  esp_err_t ret = esp_ble_get_bond_device_list(&dev_num, bond_dev);
+  if (ret != ESP_OK) {
+    log_e("Failed to get bond device list: %d", ret);
+    free(bond_dev);
+    return false;
+  }
+
+  // Find the bonded device that matches the peer address
+  bool found = false;
+
+  for (int i = 0; i < dev_num; i++) {
+    BLEAddress bondAddr(bond_dev[i].bd_addr);
+    if (bondAddr.equals(peerAddress)) {
+      // Check if the PID key (which contains the IRK) is present
+      if (bond_dev[i].bond_key.key_mask & ESP_LE_KEY_PID) {
+        memcpy(irk, bond_dev[i].bond_key.pid_key.irk, 16);
+        found = true;
+        log_d("IRK found for peer: %s", peerAddress.toString().c_str());
+        break;
+      } else {
+        log_w("PID key not present for peer: %s", peerAddress.toString().c_str());
+      }
+    }
+  }
+
+  free(bond_dev);
+
+  if (!found) {
+    log_e("IRK not found for peer");
+    return false;
+  }
+
+  log_v("<< BLEDevice::getPeerIRK()");
+  return true;
+#endif  // CONFIG_BLUEDROID_ENABLED
+
+#if defined(CONFIG_NIMBLE_ENABLED)
+  // Prepare the key structure to search for the peer's security information
+  struct ble_store_key_sec key_sec;
+  memset(&key_sec, 0, sizeof(key_sec));
+
+  // Convert BLEAddress to ble_addr_t
+  // NOTE: BLEAddress stores bytes in INVERSE order for NimBLE,
+  // but ble_addr_t.val expects them in normal order, so we reverse them
+  ble_addr_t addr;
+  uint8_t *peer_addr = peerAddress.getNative();
+  for (int i = 0; i < 6; i++) {
+    addr.val[i] = peer_addr[5 - i];
+  }
+
+  // Try public address first, then random if that fails
+  addr.type = BLE_ADDR_PUBLIC;
+  memcpy(&key_sec.peer_addr, &addr, sizeof(ble_addr_t));
+
+  // Read the peer's security information from the store
+  struct ble_store_value_sec value_sec;
+  int rc = ble_store_read_peer_sec(&key_sec, &value_sec);
+
+  // If public address failed, try random address type
+  if (rc != 0) {
+    addr.type = BLE_ADDR_RANDOM;
+    memcpy(&key_sec.peer_addr, &addr, sizeof(ble_addr_t));
+    rc = ble_store_read_peer_sec(&key_sec, &value_sec);
+
+    if (rc != 0) {
+      log_e("IRK not found for peer: %s", peerAddress.toString().c_str());
+      return false;
+    }
+  }
+
+  // Check if the IRK is present
+  if (!value_sec.irk_present) {
+    log_e("IRK not present for peer");
+    return false;
+  }
+
+  // Copy the IRK to the output buffer
+  memcpy(irk, value_sec.irk, 16);
+
+  log_d("IRK found for peer: %s (type=%d)", peerAddress.toString().c_str(), addr.type);
+  log_v("<< BLEDevice::getPeerIRK()");
+  return true;
+#endif  // CONFIG_NIMBLE_ENABLED
+}
+
+/*
+ * @brief Get a peer device's IRK as a comma-separated hex string.
+ * @param [in] peerAddress The address of the bonded peer device.
+ * @return String in format "0xXX,0xXX,..." or empty string on failure.
+ */
+String BLEDevice::getPeerIRKString(BLEAddress peerAddress) {
+  uint8_t irk[16];
+  if (!getPeerIRK(peerAddress, irk)) {
+    return String();
+  }
+
+  String result = "";
+  for (int i = 0; i < 16; i++) {
+    result += "0x";
+    if (irk[i] < 0x10) {
+      result += "0";
+    }
+    result += String(irk[i], HEX);
+    if (i < 15) {
+      result += ",";
+    }
+  }
+  return result;
+}
+
+/*
+ * @brief Get a peer device's IRK as a Base64 encoded string.
+ * @param [in] peerAddress The address of the bonded peer device.
+ * @return Base64 encoded string or empty string on failure.
+ */
+String BLEDevice::getPeerIRKBase64(BLEAddress peerAddress) {
+  uint8_t irk[16];
+  if (!getPeerIRK(peerAddress, irk)) {
+    return String();
+  }
+
+  return base64::encode(irk, 16);
+}
+
+/*
+ * @brief Get a peer device's IRK in reverse hex format.
+ * @param [in] peerAddress The address of the bonded peer device.
+ * @return String in reverse hex format (uppercase) or empty string on failure.
+ */
+String BLEDevice::getPeerIRKReverse(BLEAddress peerAddress) {
+  uint8_t irk[16];
+  if (!getPeerIRK(peerAddress, irk)) {
+    return String();
+  }
+
+  String result = "";
+  for (int i = 15; i >= 0; i--) {
+    if (irk[i] < 0x10) {
+      result += "0";
+    }
+    result += String(irk[i], HEX);
+  }
+  result.toUpperCase();
+  return result;
+}
+
 BLEAdvertising *BLEDevice::getAdvertising() {
   if (m_bleAdvertising == nullptr) {
     m_bleAdvertising = new BLEAdvertising();
@@ -664,13 +867,47 @@ void BLEDevice::removePeerDevice(uint16_t conn_id, bool _client) {
 
 /**
  * @brief de-Initialize the %BLE environment.
- * @param release_memory release the internal BT stack memory
+ * @param release_memory release the internal BT stack memory (prevents reinitialization)
  */
 void BLEDevice::deinit(bool release_memory) {
   if (!initialized) {
     return;
   }
 
+  // Stop advertising and scanning first
+  if (m_bleAdvertising != nullptr) {
+    m_bleAdvertising->stop();
+  }
+
+  if (m_pScan != nullptr) {
+    m_pScan->stop();
+  }
+
+  // Delete all BLE objects
+  if (m_bleAdvertising != nullptr) {
+    delete m_bleAdvertising;
+    m_bleAdvertising = nullptr;
+  }
+
+  if (m_pScan != nullptr) {
+    delete m_pScan;
+    m_pScan = nullptr;
+  }
+
+  if (m_pServer != nullptr) {
+    delete m_pServer;
+    m_pServer = nullptr;
+  }
+
+  if (m_pClient != nullptr) {
+    delete m_pClient;
+    m_pClient = nullptr;
+  }
+
+  // Clear the connected clients map
+  m_connectedClientsMap.clear();
+
+  // Always deinit the BLE stack
 #ifdef CONFIG_BLUEDROID_ENABLED
   esp_bluedroid_disable();
   esp_bluedroid_deinit();
@@ -681,20 +918,29 @@ void BLEDevice::deinit(bool release_memory) {
   nimble_port_deinit();
 #endif
 
+#if defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
+  hostedDeinitBLE();
+#endif
+
+#if CONFIG_BT_CONTROLLER_ENABLED
   esp_bt_controller_disable();
   esp_bt_controller_deinit();
+#endif
 
-#ifdef ARDUINO_ARCH_ESP32
+  // Only release memory if requested (this prevents reinitialization)
   if (release_memory) {
+#ifdef ARDUINO_ARCH_ESP32
     // Require tests because we released classic BT memory and this can cause crash (most likely not, esp-idf takes care of it)
+#if CONFIG_BT_CONTROLLER_ENABLED
     esp_bt_controller_mem_release(ESP_BT_MODE_BTDM);
-  } else {
-#ifdef CONFIG_NIMBLE_ENABLED
-    m_synced = false;
 #endif
-    initialized = false;
+#endif
   }
+
+#ifdef CONFIG_NIMBLE_ENABLED
+  m_synced = false;
 #endif
+  initialized = false;
 }
 
 void BLEDevice::setCustomGapHandler(gap_event_handler handler) {
@@ -706,6 +952,33 @@ void BLEDevice::setCustomGapHandler(gap_event_handler handler) {
   } else if (rc != 0) {
     log_e("ble_gap_event_listener_register: rc=%d %s", rc, GeneralUtils::errorToString(rc));
   }
+#endif
+}
+
+BLEStack BLEDevice::getBLEStack() {
+#if defined(CONFIG_BLUEDROID_ENABLED)
+  return BLEStack::BLUEDROID;
+#elif defined(CONFIG_NIMBLE_ENABLED)
+  return BLEStack::NIMBLE;
+#else
+  return BLEStack::UNKNOWN;
+#endif
+}
+
+String BLEDevice::getBLEStackString() {
+  switch (getBLEStack()) {
+    case BLEStack::BLUEDROID: return "Bluedroid";
+    case BLEStack::NIMBLE:    return "NimBLE";
+    case BLEStack::UNKNOWN:
+    default:                  return "Unknown";
+  }
+}
+
+bool BLEDevice::isHostedBLE() {
+#if defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
+  return true;
+#else
+  return false;
 #endif
 }
 
@@ -730,11 +1003,9 @@ void BLEDevice::gattServerEventHandler(esp_gatts_cb_event_t event, esp_gatt_if_t
   switch (event) {
     case ESP_GATTS_CONNECT_EVT:
     {
-#ifdef CONFIG_BLE_SMP_ENABLE  // Check that BLE SMP (security) is configured in make menuconfig
-      if (BLEDevice::m_securityLevel) {
-        esp_ble_set_encryption(param->connect.remote_bda, BLEDevice::m_securityLevel);
+      if (BLESecurity::m_securityEnabled && BLESecurity::m_forceSecurity) {
+        BLESecurity::startSecurity(param->connect.remote_bda);
       }
-#endif  // CONFIG_BLE_SMP_ENABLE
       break;
     }  // ESP_GATTS_CONNECT_EVT
 
@@ -771,11 +1042,11 @@ void BLEDevice::gattClientEventHandler(esp_gattc_cb_event_t event, esp_gatt_if_t
   switch (event) {
     case ESP_GATTC_CONNECT_EVT:
     {
-#ifdef CONFIG_BLE_SMP_ENABLE  // Check that BLE SMP (security) is configured in make menuconfig
-      if (BLEDevice::m_securityLevel) {
-        esp_ble_set_encryption(param->connect.remote_bda, BLEDevice::m_securityLevel);
+      // Set encryption on connect for BlueDroid when security is enabled
+      // This ensures security is established before any secure operations
+      if (BLESecurity::m_securityEnabled && BLESecurity::m_forceSecurity) {
+        BLESecurity::startSecurity(param->connect.remote_bda);
       }
-#endif  // CONFIG_BLE_SMP_ENABLE
       break;
     }  // ESP_GATTS_CONNECT_EVT
 
@@ -807,26 +1078,49 @@ void BLEDevice::gapEventHandler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_par
     case ESP_GAP_BLE_OOB_REQ_EVT:  /* OOB request event */ log_i("ESP_GAP_BLE_OOB_REQ_EVT"); break;
     case ESP_GAP_BLE_LOCAL_IR_EVT: /* BLE local IR event */ log_i("ESP_GAP_BLE_LOCAL_IR_EVT"); break;
     case ESP_GAP_BLE_LOCAL_ER_EVT: /* BLE local ER event */ log_i("ESP_GAP_BLE_LOCAL_ER_EVT"); break;
-    case ESP_GAP_BLE_NC_REQ_EVT:   /*  NUMERIC CONFIRMATION  */ log_i("ESP_GAP_BLE_NC_REQ_EVT");
+    case ESP_GAP_BLE_NC_REQ_EVT: /*  NUMERIC CONFIRMATION  */
+    {
+      log_i("ESP_GAP_BLE_NC_REQ_EVT");
 #ifdef CONFIG_BLE_SMP_ENABLE  // Check that BLE SMP (security) is configured in make menuconfig
       if (BLEDevice::m_securityCallbacks != nullptr) {
         esp_ble_confirm_reply(param->ble_security.ble_req.bd_addr, BLEDevice::m_securityCallbacks->onConfirmPIN(param->ble_security.key_notif.passkey));
+      } else {
+        log_e("onConfirmPIN not implemented. Rejecting connection");
+        esp_ble_confirm_reply(param->ble_security.ble_req.bd_addr, false);
       }
 #endif  // CONFIG_BLE_SMP_ENABLE
-      break;
+    } break;
     case ESP_GAP_BLE_PASSKEY_REQ_EVT: /* passkey request event */
+    {
       log_i("ESP_GAP_BLE_PASSKEY_REQ_EVT: ");
       // esp_log_buffer_hex(m_remote_bda, sizeof(m_remote_bda));
 #ifdef CONFIG_BLE_SMP_ENABLE  // Check that BLE SMP (security) is configured in make menuconfig
-      if (BLEDevice::m_securityCallbacks != nullptr) {
-        esp_ble_passkey_reply(param->ble_security.ble_req.bd_addr, true, BLEDevice::m_securityCallbacks->onPassKeyRequest());
+      uint32_t passkey = BLESecurity::getPassKey();
+
+      if (!BLESecurity::m_passkeySet) {
+        if (BLEDevice::m_securityCallbacks != nullptr) {
+          log_i("No passkey set, getting passkey from onPassKeyRequest");
+          passkey = BLEDevice::m_securityCallbacks->onPassKeyRequest();
+        } else {
+          log_w("*ATTENTION* onPassKeyRequest not implemented and no static passkey set.");
+        }
       }
+
+      if (BLESecurity::m_staticPasskey && passkey == BLE_SM_DEFAULT_PASSKEY) {
+        log_w("*ATTENTION* Using default passkey: %06d", BLE_SM_DEFAULT_PASSKEY);
+        log_w("*ATTENTION* Please use a random passkey or set a different static passkey");
+      } else {
+        log_i("Passkey: %d", passkey);
+      }
+
+      esp_ble_passkey_reply(param->ble_security.ble_req.bd_addr, true, passkey);
 #endif  // CONFIG_BLE_SMP_ENABLE
-      break;
+    } break;
       /*
 			 * TODO should we add white/black list comparison?
 			 */
     case ESP_GAP_BLE_SEC_REQ_EVT:
+    {
       /* send the positive(true) security response to the peer device to accept the security request.
 			 If not accept the security request, should sent the security response with negative(false) accept value*/
       log_i("ESP_GAP_BLE_SEC_REQ_EVT");
@@ -834,37 +1128,58 @@ void BLEDevice::gapEventHandler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_par
       if (BLEDevice::m_securityCallbacks != nullptr) {
         esp_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, BLEDevice::m_securityCallbacks->onSecurityRequest());
       } else {
+        log_w("onSecurityRequest not implemented. Accepting security request");
         esp_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, true);
       }
 #endif  // CONFIG_BLE_SMP_ENABLE
-      break;
+    } break;
       /*
 			  *
 			  */
     case ESP_GAP_BLE_PASSKEY_NOTIF_EVT:  //the app will receive this evt when the IO  has Output capability and the peer device IO has Input capability.
+    {
       //display the passkey number to the user to input it in the peer device within 30 seconds
       log_i("ESP_GAP_BLE_PASSKEY_NOTIF_EVT");
 #ifdef CONFIG_BLE_SMP_ENABLE  // Check that BLE SMP (security) is configured in make menuconfig
-      log_i("passKey = %d", param->ble_security.key_notif.passkey);
+      uint32_t passkey = param->ble_security.key_notif.passkey;
+
+      if (!BLESecurity::m_passkeySet) {
+        log_w("No passkey set");
+      }
+
+      if (BLESecurity::m_staticPasskey && passkey == BLE_SM_DEFAULT_PASSKEY) {
+        log_w("*ATTENTION* Using default passkey: %06d", BLE_SM_DEFAULT_PASSKEY);
+        log_w("*ATTENTION* Please use a random passkey or set a different static passkey");
+      } else {
+        log_i("Passkey: %d", passkey);
+      }
+
       if (BLEDevice::m_securityCallbacks != nullptr) {
-        BLEDevice::m_securityCallbacks->onPassKeyNotify(param->ble_security.key_notif.passkey);
+        BLEDevice::m_securityCallbacks->onPassKeyNotify(passkey);
       }
 #endif  // CONFIG_BLE_SMP_ENABLE
-      break;
+    } break;
     case ESP_GAP_BLE_KEY_EVT:
+    {
       //shows the ble key type info share with peer device to the user.
       log_d("ESP_GAP_BLE_KEY_EVT");
 #ifdef CONFIG_BLE_SMP_ENABLE  // Check that BLE SMP (security) is configured in make menuconfig
       log_i("key type = %s", BLESecurity::esp_key_type_to_str(param->ble_security.ble_key.key_type));
 #endif  // CONFIG_BLE_SMP_ENABLE
-      break;
-    case ESP_GAP_BLE_AUTH_CMPL_EVT: log_i("ESP_GAP_BLE_AUTH_CMPL_EVT");
+    } break;
+    case ESP_GAP_BLE_AUTH_CMPL_EVT:
+    {
+      log_i("ESP_GAP_BLE_AUTH_CMPL_EVT");
 #ifdef CONFIG_BLE_SMP_ENABLE  // Check that BLE SMP (security) is configured in make menuconfig
+      // Signal that authentication has completed
+      // This unblocks any GATT operations waiting for pairing when bonding is enabled
+      BLESecurity::signalAuthenticationComplete();
+
       if (BLEDevice::m_securityCallbacks != nullptr) {
         BLEDevice::m_securityCallbacks->onAuthenticationComplete(param->ble_security.auth_cmpl);
       }
 #endif  // CONFIG_BLE_SMP_ENABLE
-      break;
+    } break;
     default:
     {
       break;
@@ -894,14 +1209,6 @@ void BLEDevice::setCustomGattcHandler(gattc_event_handler handler) {
 
 void BLEDevice::setCustomGattsHandler(gatts_event_handler handler) {
   m_customGattsHandler = handler;
-}
-
-/*
- * @brief Set encryption level that will be negotiated with peer device durng connection
- * @param [in] level Requested encryption level
- */
-void BLEDevice::setEncryptionLevel(esp_ble_sec_act_t level) {
-  BLEDevice::m_securityLevel = level;
 }
 
 #endif
@@ -1062,4 +1369,4 @@ int BLEDeviceCallbacks::onStoreStatus(struct ble_store_status_event *event, void
 #endif
 
 #endif /* CONFIG_BLUEDROID_ENABLED || CONFIG_NIMBLE_ENABLED */
-#endif /* SOC_BLE_SUPPORTED */
+#endif /* SOC_BLE_SUPPORTED || CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE */

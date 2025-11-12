@@ -11,10 +11,10 @@
 
 #ifndef COMPONENTS_CPP_UTILS_BLEADDRESS_H_
 #define COMPONENTS_CPP_UTILS_BLEADDRESS_H_
-#include "soc/soc_caps.h"
-#if SOC_BLE_SUPPORTED
 
+#include "soc/soc_caps.h"
 #include "sdkconfig.h"
+#if defined(SOC_BLE_SUPPORTED) || defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
 #if defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)
 
 /***************************************************************************
@@ -22,7 +22,9 @@
  ***************************************************************************/
 
 #include "WString.h"
+#if SOC_BLE_SUPPORTED
 #include <esp_bt.h>
+#endif
 #include <string>
 
 /***************************************************************************
@@ -62,7 +64,7 @@ public:
    ***************************************************************************/
 
   BLEAddress();
-  bool equals(BLEAddress otherAddress);
+  bool equals(const BLEAddress &otherAddress) const;
   bool operator==(const BLEAddress &otherAddress) const;
   bool operator!=(const BLEAddress &otherAddress) const;
   bool operator<(const BLEAddress &otherAddress) const;
@@ -70,7 +72,7 @@ public:
   bool operator>(const BLEAddress &otherAddress) const;
   bool operator>=(const BLEAddress &otherAddress) const;
   uint8_t *getNative();
-  String toString();
+  String toString() const;
 
   /***************************************************************************
    *                       Bluedroid public declarations                     *
@@ -78,7 +80,7 @@ public:
 
 #if defined(CONFIG_BLUEDROID_ENABLED)
   BLEAddress(esp_bd_addr_t address);
-  BLEAddress(String stringAddress);
+  BLEAddress(const String &stringAddress);
 #endif
 
   /***************************************************************************
@@ -87,9 +89,9 @@ public:
 
 #if defined(CONFIG_NIMBLE_ENABLED)
   BLEAddress(ble_addr_t address);
-  BLEAddress(String stringAddress, uint8_t type = BLE_ADDR_PUBLIC);
+  BLEAddress(const String &stringAddress, uint8_t type = BLE_ADDR_PUBLIC);
   BLEAddress(uint8_t address[ESP_BD_ADDR_LEN], uint8_t type = BLE_ADDR_PUBLIC);
-  uint8_t getType();
+  uint8_t getType() const;
 #endif
 
 private:
@@ -109,5 +111,6 @@ private:
 };
 
 #endif /* CONFIG_BLUEDROID_ENABLED || CONFIG_NIMBLE_ENABLED */
-#endif /* SOC_BLE_SUPPORTED */
+#endif /* SOC_BLE_SUPPORTED || CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE */
+
 #endif /* COMPONENTS_CPP_UTILS_BLEADDRESS_H_ */

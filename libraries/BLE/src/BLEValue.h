@@ -13,9 +13,8 @@
 #define COMPONENTS_CPP_UTILS_BLEVALUE_H_
 
 #include "soc/soc_caps.h"
-#if SOC_BLE_SUPPORTED
-
 #include "sdkconfig.h"
+#if defined(SOC_BLE_SUPPORTED) || defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
 #if defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)
 
 /*****************************************************************************
@@ -34,17 +33,17 @@ public:
    ***************************************************************************/
 
   BLEValue();
-  void addPart(String part);
-  void addPart(uint8_t *pData, size_t length);
+  void addPart(const String &part);
+  void addPart(const uint8_t *pData, size_t length);
   void cancel();
   void commit();
   uint8_t *getData();
-  size_t getLength();
-  uint16_t getReadOffset();
-  String getValue();
+  size_t getLength() const;
+  uint16_t getReadOffset() const;
+  String getValue() const;
   void setReadOffset(uint16_t readOffset);
-  void setValue(String value);
-  void setValue(uint8_t *pData, size_t length);
+  void setValue(const String &value);
+  void setValue(const uint8_t *pData, size_t length);
 
 private:
   /***************************************************************************
@@ -57,5 +56,6 @@ private:
 };
 
 #endif /* CONFIG_BLUEDROID_ENABLED || CONFIG_NIMBLE_ENABLED */
-#endif /* SOC_BLE_SUPPORTED */
+#endif /* SOC_BLE_SUPPORTED || CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE */
+
 #endif /* COMPONENTS_CPP_UTILS_BLEVALUE_H_ */

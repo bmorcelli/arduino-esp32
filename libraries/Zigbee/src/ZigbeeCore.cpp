@@ -1,3 +1,17 @@
+// Copyright 2025 Espressif Systems (Shanghai) PTE LTD
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 /* Zigbee Core Functions */
 
 #include "ZigbeeCore.h"
@@ -32,6 +46,7 @@ ZigbeeCore::ZigbeeCore() {
   _scan_duration = 3;  // default scan duration
   _rx_on_when_idle = true;
   _debug = false;
+  _allow_multi_endpoint_binding = false;
   _global_default_response_cb = nullptr;  // Initialize global callback to nullptr
   if (!lock) {
     lock = xSemaphoreCreateBinary();
@@ -378,7 +393,9 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct) {
                 log_d("Device not bound to endpoint %d and it is free to bound!", (*it)->getEndpoint());
                 (*it)->findEndpoint(&cmd_req);
                 log_d("Endpoint %d is searching for device", (*it)->getEndpoint());
-                break;  // Only one endpoint per device
+                if (!Zigbee.allowMultiEndpointBinding()) {  // If multi endpoint binding is not allowed, break the loop to keep backwards compatibility
+                  break;
+                }
               }
             }
           }
@@ -408,11 +425,13 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct) {
                   break;
                 }
               }
-              log_d("Device not bound to endpoint %d and it is free to bound!", (*it)->getEndpoint());
               if (!found) {
+                log_d("Device not bound to endpoint %d and it is free to bound!", (*it)->getEndpoint());
                 (*it)->findEndpoint(&cmd_req);
                 log_d("Endpoint %d is searching for device", (*it)->getEndpoint());
-                break;  // Only one endpoint per device
+                if (!Zigbee.allowMultiEndpointBinding()) {  // If multi endpoint binding is not allowed, break the loop to keep backwards compatibility
+                  break;
+                }
               }
             }
           }
@@ -515,8 +534,14 @@ void ZigbeeCore::scanNetworks(u_int32_t channel_mask, u_int8_t scan_duration) {
     log_e("Zigbee stack is not started, cannot scan networks");
     return;
   }
+  if (_scan_status == ZB_SCAN_RUNNING) {
+    log_w("Scan already in progress, ignoring new scan request");
+    return;
+  }
   log_v("Scanning Zigbee networks");
+  esp_zb_lock_acquire(portMAX_DELAY);
   esp_zb_zdo_active_scan_request(channel_mask, scan_duration, scanCompleteCallback);
+  esp_zb_lock_release();
   _scan_status = ZB_SCAN_RUNNING;
 }
 
@@ -748,6 +773,24 @@ void ZigbeeCore::setNVRAMChannelMask(uint32_t mask) {
   esp_zb_set_channel_mask(_primary_channel_mask);
   zb_nvram_write_dataset(ZB_NVRAM_COMMON_DATA);
   log_v("Channel mask set to 0x%08x", mask);
+}
+
+void ZigbeeCore::stop() {
+  if (started()) {
+    vTaskSuspend(xTaskGetHandle("Zigbee_main"));
+    log_v("Zigbee stack stopped");
+    _started = false;
+  }
+  return;
+}
+
+void ZigbeeCore::start() {
+  if (!started()) {
+    vTaskResume(xTaskGetHandle("Zigbee_main"));
+    log_v("Zigbee stack started");
+    _started = true;
+  }
+  return;
 }
 
 // Function to convert enum value to string

@@ -10,16 +10,17 @@
  */
 
 #include "soc/soc_caps.h"
-#if SOC_BLE_SUPPORTED
-
 #include "sdkconfig.h"
+#if defined(SOC_BLE_SUPPORTED) || defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
 #if defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)
 
 /***************************************************************************
  *                       Common includes                                   *
  ***************************************************************************/
 
+#if SOC_BLE_SUPPORTED
 #include <esp_bt.h>
+#endif
 #include "GeneralUtils.h"
 #include "BLEDevice.h"
 #include "BLEServer.h"
@@ -65,6 +66,10 @@ BLEServer::BLEServer() {
 #if defined(CONFIG_NIMBLE_ENABLED)
   memset(m_indWait, BLE_HS_CONN_HANDLE_NONE, sizeof(m_indWait));
   m_svcChanged = false;
+#endif
+
+#if !defined(CONFIG_BT_NIMBLE_EXT_ADV) || defined(CONFIG_BLUEDROID_ENABLED)
+  m_advertiseOnDisconnect = false;
 #endif
 
   m_appId = ESP_GATT_IF_NONE;
@@ -296,6 +301,12 @@ bool BLEServer::removePeerDevice(uint16_t conn_id, bool _client) {
   return m_connectedServersMap.erase(conn_id) > 0;
 }
 
+#if !defined(CONFIG_BT_NIMBLE_EXT_ADV) || defined(CONFIG_BLUEDROID_ENABLED)
+void BLEServer::advertiseOnDisconnect(bool enable) {
+  m_advertiseOnDisconnect = enable;
+}
+#endif
+
 void BLEServerCallbacks::onConnect(BLEServer *pServer) {
   log_d("BLEServerCallbacks", ">> onConnect(): Default");
   log_d("BLEServerCallbacks", "Device: %s", BLEDevice::toString().c_str());
@@ -449,6 +460,16 @@ void BLEServer::handleGATTServerEvent(esp_gatts_cb_event_t event, esp_gatt_if_t 
       if (removePeerDevice(param->disconnect.conn_id, false)) {
         m_connectedCount--;  // Decrement the number of connected devices count.
       }
+
+      // Reset security state on disconnect
+      BLESecurity::resetSecurity();
+
+      // Start advertising again if enabled
+      if (m_advertiseOnDisconnect) {
+        log_i("Start advertising again after disconnect");
+        startAdvertising();
+      }
+
       break;
     }  // ESP_GATTS_DISCONNECT_EVT
 
@@ -621,6 +642,10 @@ int BLEServer::handleGATTServerEvent(struct ble_gap_event *event, void *arg) {
           server->m_pServerCallbacks->onConnect(server, &desc);
         }
 
+        if (BLESecurity::m_securityEnabled && BLESecurity::m_forceSecurity) {
+          BLESecurity::startSecurity(event->connect.conn_handle);
+        }
+
         server->m_connectedCount++;
       }
 
@@ -654,6 +679,16 @@ int BLEServer::handleGATTServerEvent(struct ble_gap_event *event, void *arg) {
         server->m_pServerCallbacks->onDisconnect(server);
         server->m_pServerCallbacks->onDisconnect(server, &event->disconnect.conn);
       }
+
+      // Reset security state on disconnect
+      BLESecurity::resetSecurity();
+
+#if !defined(CONFIG_BT_NIMBLE_EXT_ADV)
+      if (server->m_advertiseOnDisconnect) {
+        log_i("Start advertising again after disconnect");
+        server->startAdvertising();
+      }
+#endif
 
       return 0;
     }  // BLE_GAP_EVENT_DISCONNECT
@@ -784,8 +819,6 @@ int BLEServer::handleGATTServerEvent(struct ble_gap_event *event, void *arg) {
 
       if (BLEDevice::m_securityCallbacks != nullptr) {
         BLEDevice::m_securityCallbacks->onAuthenticationComplete(&desc);
-      } else if (server->m_pServerCallbacks != nullptr) {
-        server->m_pServerCallbacks->onAuthenticationComplete(&desc);
       }
 
       return 0;
@@ -796,62 +829,123 @@ int BLEServer::handleGATTServerEvent(struct ble_gap_event *event, void *arg) {
       struct ble_sm_io pkey = {0, 0};
 
       if (event->passkey.params.action == BLE_SM_IOACT_DISP) {
+        // Display the passkey on this device
+        log_d("BLE_SM_IOACT_DISP");
+
         pkey.action = event->passkey.params.action;
-        // backward compatibility
-        pkey.passkey = BLESecurity::m_passkey;
-        // if the (static)passkey is the default, check the callback for custom value
-        // both values default to the same.
-        if (pkey.passkey == BLE_SM_DEFAULT_PASSKEY) {
-          if (server->m_pServerCallbacks != nullptr) {
-            pkey.passkey = server->m_pServerCallbacks->onPassKeyRequest();
-          }
+        pkey.passkey = BLESecurity::getPassKey();
+
+        if (!BLESecurity::m_passkeySet) {
+          log_w("No passkey set");
         }
+
+        if (BLESecurity::m_staticPasskey && pkey.passkey == BLE_SM_DEFAULT_PASSKEY) {
+          log_w("*ATTENTION* Using default passkey: %06d", BLE_SM_DEFAULT_PASSKEY);
+          log_w("*ATTENTION* Please use a random passkey or set a different static passkey");
+        } else {
+          log_i("Passkey: %d", pkey.passkey);
+        }
+
+        if (BLEDevice::m_securityCallbacks != nullptr) {
+          BLEDevice::m_securityCallbacks->onPassKeyNotify(pkey.passkey);
+        }
+
         rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
         log_d("BLE_SM_IOACT_DISP; ble_sm_inject_io result: %d", rc);
 
       } else if (event->passkey.params.action == BLE_SM_IOACT_NUMCMP) {
+        // Check if the passkey on the peer device is correct
+        log_d("BLE_SM_IOACT_NUMCMP");
+
         log_d("Passkey on device's display: %d", event->passkey.params.numcmp);
         pkey.action = event->passkey.params.action;
-        // Compatibility only - Do not use, should be removed the in future
+
         if (BLEDevice::m_securityCallbacks != nullptr) {
           pkey.numcmp_accept = BLEDevice::m_securityCallbacks->onConfirmPIN(event->passkey.params.numcmp);
-        } else if (server->m_pServerCallbacks != nullptr) {
-          pkey.numcmp_accept = server->m_pServerCallbacks->onConfirmPIN(event->passkey.params.numcmp);
+        } else {
+          log_e("onConfirmPIN not implemented. Rejecting connection");
+          pkey.numcmp_accept = 0;
         }
 
         rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
         log_d("BLE_SM_IOACT_NUMCMP; ble_sm_inject_io result: %d", rc);
 
-        //TODO: Handle out of band pairing
       } else if (event->passkey.params.action == BLE_SM_IOACT_OOB) {
+        // Out of band pairing
+        // TODO: Handle out of band pairing
+        log_w("BLE_SM_IOACT_OOB: Not implemented");
+
         static uint8_t tem_oob[16] = {0};
         pkey.action = event->passkey.params.action;
         for (int i = 0; i < 16; i++) {
           pkey.oob[i] = tem_oob[i];
         }
+
         rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
         log_d("BLE_SM_IOACT_OOB; ble_sm_inject_io result: %d", rc);
       } else if (event->passkey.params.action == BLE_SM_IOACT_INPUT) {
-        log_d("Enter the passkey");
-        pkey.action = event->passkey.params.action;
+        // Input passkey from peer device
+        log_d("BLE_SM_IOACT_INPUT");
 
-        // Compatibility only - Do not use, should be removed the in future
-        if (BLEDevice::m_securityCallbacks != nullptr) {
-          pkey.passkey = BLEDevice::m_securityCallbacks->onPassKeyRequest();
-        } else if (server->m_pServerCallbacks != nullptr) {
-          pkey.passkey = server->m_pServerCallbacks->onPassKeyRequest();
+        pkey.action = event->passkey.params.action;
+        pkey.passkey = BLESecurity::getPassKey();
+
+        if (!BLESecurity::m_passkeySet) {
+          if (BLEDevice::m_securityCallbacks != nullptr) {
+            log_i("No passkey set, getting passkey from onPassKeyRequest");
+            pkey.passkey = BLEDevice::m_securityCallbacks->onPassKeyRequest();
+          } else {
+            log_w("*ATTENTION* onPassKeyRequest not implemented and no static passkey set.");
+          }
+        }
+
+        if (BLESecurity::m_staticPasskey && pkey.passkey == BLE_SM_DEFAULT_PASSKEY) {
+          log_w("*ATTENTION* Using default passkey: %06d", BLE_SM_DEFAULT_PASSKEY);
+          log_w("*ATTENTION* Please use a random passkey or set a different static passkey");
+        } else {
+          log_i("Passkey: %d", pkey.passkey);
         }
 
         rc = ble_sm_inject_io(event->passkey.conn_handle, &pkey);
         log_d("BLE_SM_IOACT_INPUT; ble_sm_inject_io result: %d", rc);
 
       } else if (event->passkey.params.action == BLE_SM_IOACT_NONE) {
-        log_d("No passkey action required");
+        log_d("BLE_SM_IOACT_NONE");
+        log_i("No passkey action required");
       }
 
       log_d("<< handleGATTServerEvent");
       return 0;
     }  // BLE_GAP_EVENT_PASSKEY_ACTION
+
+    case BLE_GAP_EVENT_AUTHORIZE:
+    {
+      log_d("BLE_GAP_EVENT_AUTHORIZE");
+
+      log_i(
+        "Authorization request: conn_handle=%d attr_handle=%d is_read=%d", event->authorize.conn_handle, event->authorize.attr_handle, event->authorize.is_read
+      );
+
+      bool authorized = false;
+
+      if (BLEDevice::m_securityCallbacks != nullptr) {
+        log_i("Asking for authorization from onAuthorizationRequest");
+        authorized =
+          BLEDevice::m_securityCallbacks->onAuthorizationRequest(event->authorize.conn_handle, event->authorize.attr_handle, event->authorize.is_read);
+      } else {
+        log_w("onAuthorizationRequest not implemented. Rejecting authorization request");
+      }
+
+      if (authorized) {
+        log_i("Authorization granted");
+        event->authorize.out_response = BLE_GAP_AUTHORIZE_ACCEPT;
+      } else {
+        log_i("Authorization rejected");
+        event->authorize.out_response = BLE_GAP_AUTHORIZE_REJECT;
+      }
+
+      return 0;
+    }  // BLE_GAP_EVENT_AUTHORIZE
 
     default: break;
   }
@@ -951,21 +1045,7 @@ void BLEServerCallbacks::onMtuChanged(BLEServer *pServer, ble_gap_conn_desc *des
   log_d("BLEServerCallbacks", "<< onMtuChanged()");
 }  // onMtuChanged
 
-uint32_t BLEServerCallbacks::onPassKeyRequest() {
-  log_d("BLEServerCallbacks", "onPassKeyRequest: default: 123456");
-  return 123456;
-}
-
-void BLEServerCallbacks::onAuthenticationComplete(ble_gap_conn_desc *) {
-  log_d("BLEServerCallbacks", "onAuthenticationComplete: default");
-}
-
-bool BLEServerCallbacks::onConfirmPIN(uint32_t pin) {
-  log_d("BLEServerCallbacks", "onConfirmPIN: default: true");
-  return true;
-}
-
 #endif  // CONFIG_NIMBLE_ENABLED
 
 #endif /* CONFIG_BLUEDROID_ENABLED || CONFIG_NIMBLE_ENABLED */
-#endif /* SOC_BLE_SUPPORTED */
+#endif /* SOC_BLE_SUPPORTED || CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE */

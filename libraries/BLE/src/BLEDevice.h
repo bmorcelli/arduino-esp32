@@ -11,10 +11,10 @@
 
 #ifndef MAIN_BLEDevice_H_
 #define MAIN_BLEDevice_H_
-#include "soc/soc_caps.h"
-#if SOC_BLE_SUPPORTED
 
+#include "soc/soc_caps.h"
 #include "sdkconfig.h"
+#if defined(SOC_BLE_SUPPORTED) || defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
 #if defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)
 
 /***************************************************************************
@@ -22,8 +22,19 @@
  ***************************************************************************/
 
 #include <map>
-#include <string>
+
+#if defined(SOC_BLE_SUPPORTED)
 #include <esp_bt.h>
+#else
+// For ESP32-P4 and other chips without native BLE support
+// Define minimal types needed for interface compatibility
+typedef int esp_power_level_t;
+typedef int esp_ble_power_type_t;
+#define ESP_BLE_PWR_TYPE_DEFAULT 0
+#define ESP_PWR_LVL_N12          0
+#endif
+
+#include "WString.h"
 #include "BLEServer.h"
 #include "BLEClient.h"
 #include "BLEUtils.h"
@@ -32,6 +43,18 @@
 #include "BLESecurity.h"
 #include "BLEAddress.h"
 #include "BLEUtils.h"
+#include "BLEUUID.h"
+#include "BLEAdvertisedDevice.h"
+
+/***************************************************************************
+ *                           Common definitions                            *
+ ***************************************************************************/
+
+enum class BLEStack {
+  BLUEDROID,
+  NIMBLE,
+  UNKNOWN
+};
 
 /***************************************************************************
  *                           Bluedroid includes                            *
@@ -50,6 +73,9 @@
 #if defined(CONFIG_NIMBLE_ENABLED)
 #include <host/ble_gap.h>
 #define ESP_GATT_IF_NONE BLE_HS_CONN_HANDLE_NONE
+
+// Hosted HCI transport implementation is provided in BLEHostedHCI.cpp
+// and is automatically linked when building for ESP32-P4
 
 // NimBLE configuration compatibility macros
 #if defined(CONFIG_SCAN_DUPLICATE_BY_DEVICE_ADDR) && !defined(CONFIG_BTDM_SCAN_DUPL_TYPE_DEVICE)
@@ -141,7 +167,6 @@ public:
    ***************************************************************************/
 
 #if defined(CONFIG_BLUEDROID_ENABLED)
-  static esp_ble_sec_act_t m_securityLevel;
   static gattc_event_handler m_customGattcHandler;
   static gatts_event_handler m_customGattsHandler;
 #endif
@@ -167,6 +192,10 @@ public:
   static esp_err_t setMTU(uint16_t mtu);
   static uint16_t getMTU();
   static bool getInitialized();
+  static bool getPeerIRK(BLEAddress peerAddress, uint8_t *irk);
+  static String getPeerIRKString(BLEAddress peerAddress);
+  static String getPeerIRKBase64(BLEAddress peerAddress);
+  static String getPeerIRKReverse(BLEAddress peerAddress);
   static BLEAdvertising *getAdvertising();
   static void startAdvertising();
   static void stopAdvertising();
@@ -179,13 +208,15 @@ public:
   static BLEClient *getClientByGattIf(uint16_t conn_id);
   static void setCustomGapHandler(gap_event_handler handler);
   static void deinit(bool release_memory = false);
+  static BLEStack getBLEStack();
+  static String getBLEStackString();
+  static bool isHostedBLE();
 
   /***************************************************************************
    *                       Bluedroid public declarations                    *
    ***************************************************************************/
 
 #if defined(CONFIG_BLUEDROID_ENABLED)
-  static void setEncryptionLevel(esp_ble_sec_act_t level);
   static void setCustomGattcHandler(gattc_event_handler handler);
   static void setCustomGattsHandler(gatts_event_handler handler);
 #endif
@@ -262,5 +293,6 @@ public:
 #endif
 
 #endif /* CONFIG_BLUEDROID_ENABLED || CONFIG_NIMBLE_ENABLED */
-#endif /* SOC_BLE_SUPPORTED */
+#endif /* SOC_BLE_SUPPORTED || CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE */
+
 #endif /* MAIN_BLEDevice_H_ */

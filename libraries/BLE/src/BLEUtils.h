@@ -11,10 +11,10 @@
 
 #ifndef COMPONENTS_CPP_UTILS_BLEUTILS_H_
 #define COMPONENTS_CPP_UTILS_BLEUTILS_H_
-#include "soc/soc_caps.h"
-#if SOC_BLE_SUPPORTED
 
+#include "soc/soc_caps.h"
 #include "sdkconfig.h"
+#if defined(SOC_BLE_SUPPORTED) || defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
 #if defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)
 
 /*****************************************************************************
@@ -96,7 +96,7 @@ public:
    *                       Common public declarations                        *
    ***************************************************************************/
 
-  static char *buildHexData(uint8_t *target, uint8_t *source, uint8_t length);
+  static char *buildHexData(uint8_t *target, const uint8_t *source, uint8_t length);
   static String buildPrintData(uint8_t *source, size_t length);
   static const char *advDataTypeToString(uint8_t advType);
   static String characteristicPropertiesToString(uint8_t prop);
@@ -148,5 +148,6 @@ public:
 };
 
 #endif /* CONFIG_BLUEDROID_ENABLED || CONFIG_NIMBLE_ENABLED */
-#endif /* SOC_BLE_SUPPORTED */
+#endif /* SOC_BLE_SUPPORTED || CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE */
+
 #endif /* COMPONENTS_CPP_UTILS_BLEUTILS_H_ */

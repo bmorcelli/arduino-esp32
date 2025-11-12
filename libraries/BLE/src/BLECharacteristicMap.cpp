@@ -10,9 +10,8 @@
  */
 
 #include "soc/soc_caps.h"
-#if SOC_BLE_SUPPORTED
-
 #include "sdkconfig.h"
+#if defined(SOC_BLE_SUPPORTED) || defined(CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE)
 #if defined(CONFIG_BLUEDROID_ENABLED) || defined(CONFIG_NIMBLE_ENABLED)
 
 /***************************************************************************
@@ -36,7 +35,7 @@
  * @param [in] handle The handle to look up the characteristic.
  * @return The characteristic.
  */
-BLECharacteristic *BLECharacteristicMap::getByHandle(uint16_t handle) {
+BLECharacteristic *BLECharacteristicMap::getByHandle(uint16_t handle) const {
   return m_handleMap.at(handle);
 }  // getByHandle
 
@@ -45,7 +44,7 @@ BLECharacteristic *BLECharacteristicMap::getByHandle(uint16_t handle) {
  * @param [in] UUID The UUID to look up the characteristic.
  * @return The characteristic.
  */
-BLECharacteristic *BLECharacteristicMap::getByUUID(const char *uuid) {
+BLECharacteristic *BLECharacteristicMap::getByUUID(const char *uuid) const {
   return getByUUID(BLEUUID(uuid));
 }
 
@@ -54,7 +53,7 @@ BLECharacteristic *BLECharacteristicMap::getByUUID(const char *uuid) {
  * @param [in] UUID The UUID to look up the characteristic.
  * @return The characteristic.
  */
-BLECharacteristic *BLECharacteristicMap::getByUUID(BLEUUID uuid) {
+BLECharacteristic *BLECharacteristicMap::getByUUID(BLEUUID uuid) const {
   for (auto &myPair : m_uuidMap) {
     if (myPair.first->getUUID().equals(uuid)) {
       return myPair.first;
@@ -95,7 +94,7 @@ BLECharacteristic *BLECharacteristicMap::getNext() {
  * @brief Get the number of registered characteristics.
  * @return The number of registered characteristics.
  */
-int BLECharacteristicMap::getRegisteredCharacteristicCount() {
+int BLECharacteristicMap::getRegisteredCharacteristicCount() const {
   return m_uuidMap.size();
 }  // getRegisteredCharacteristicCount
 
@@ -133,7 +132,7 @@ void BLECharacteristicMap::setByUUID(BLECharacteristic *pCharacteristic, BLEUUID
  * @brief Return a string representation of the characteristic map.
  * @return A string representation of the characteristic map.
  */
-String BLECharacteristicMap::toString() {
+String BLECharacteristicMap::toString() const {
   String res;
   int count = 0;
   char hex[5];
@@ -183,4 +182,4 @@ void BLECharacteristicMap::handleGATTServerEvent(uint16_t conn_handle, uint16_t 
 #endif  // CONFIG_NIMBLE_ENABLED
 
 #endif /* CONFIG_BLUEDROID_ENABLED || CONFIG_NIMBLE_ENABLED */
-#endif /* SOC_BLE_SUPPORTED */
+#endif /* SOC_BLE_SUPPORTED || CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE */
