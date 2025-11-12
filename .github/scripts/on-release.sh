@@ -54,30 +54,6 @@ if [ -n "${VENDOR}" ]; then
     echo "Setting packager: $VENDOR"
 fi
 
-function update_version {
-    set -e
-    set -o pipefail
-
-    local tag=$1
-    local major
-    local minor
-    local patch
-
-    # Extract major, minor, and patch from the tag
-    # We need to make sure to remove the "v" prefix from the tag and any characters after the patch version
-    tag=$(echo "$tag" | sed 's/^v//g' | sed 's/-.*//g')
-    major=$(echo "$tag" | cut -d. -f1)
-    minor=$(echo "$tag" | cut -d. -f2)
-    patch=$(echo "$tag" | cut -d. -f3 | sed 's/[^0-9].*//')  # Remove non-numeric suffixes like RC1, alpha, beta
-
-    echo "Major: $major, Minor: $minor, Patch: $patch"
-
-    "${SCRIPTS_DIR}/update-version.sh" "$major" "$minor" "$patch"
-
-    set +e
-    set +o pipefail
-}
-
 function get_file_size {
     local file="$1"
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -230,7 +206,7 @@ LIBS_ZIP="$PACKAGE_NAME-libs.zip"
 LIBS_XZ="$PACKAGE_NAME-libs.tar.xz"
 
 echo "Updating version..."
-if ! update_version "$RELEASE_TAG"; then
+if ! "${SCRIPTS_DIR}/update-version.sh" "$RELEASE_TAG"; then
     echo "ERROR: update_version failed!"
     exit 1
 fi
@@ -414,6 +390,11 @@ unzip -q "$OUTPUT_DIR/$LIBS_ZIP" -d "$OUTPUT_DIR"
 pushd "$OUTPUT_DIR" >/dev/null
 tar -cJf "$LIBS_XZ" "esp32-arduino-libs"
 popd >/dev/null
+
+# Copy esp-hosted binaries
+
+mkdir -p "$GITHUB_WORKSPACE/hosted"
+cp "$OUTPUT_DIR/esp32-arduino-libs/hosted"/*.bin "$GITHUB_WORKSPACE/hosted/"
 
 # Upload ZIP and XZ libs to release page
 

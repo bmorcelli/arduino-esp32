@@ -143,6 +143,8 @@ bool WebServer::authenticateBasicSHA1(const char *_username, const char *_sha1Ba
 
 bool WebServer::authenticate(const char *_username, const char *_password) {
   return WebServer::authenticate([_username, _password](HTTPAuthMethod mode, String username, String params[]) -> String * {
+    (void)mode;
+    (void)params;
     return username.equalsConstantTime(_username) ? new String(_password) : NULL;
   });
 }
@@ -613,7 +615,7 @@ void WebServer::chunkResponseEnd() {
     log_e("Failed to write terminating chunk");
   }
 
-  _chunkedClient.flush();
+  _chunkedClient.clear();
   _chunkedResponseActive = false;
   _chunked = false;
   _chunkedClient = NetworkClient();
