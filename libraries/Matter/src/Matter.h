@@ -29,6 +29,9 @@
 #include <MatterEndpoints/MatterTemperatureSensor.h>
 #include <MatterEndpoints/MatterHumiditySensor.h>
 #include <MatterEndpoints/MatterContactSensor.h>
+#include <MatterEndpoints/MatterWaterLeakDetector.h>
+#include <MatterEndpoints/MatterWaterFreezeDetector.h>
+#include <MatterEndpoints/MatterRainSensor.h>
 #include <MatterEndpoints/MatterPressureSensor.h>
 #include <MatterEndpoints/MatterOccupancySensor.h>
 #include <MatterEndpoints/MatterOnOffPlugin.h>
@@ -194,6 +197,9 @@ public:
   friend class MatterTemperatureSensor;
   friend class MatterHumiditySensor;
   friend class MatterContactSensor;
+  friend class MatterWaterLeakDetector;
+  friend class MatterWaterFreezeDetector;
+  friend class MatterRainSensor;
   friend class MatterPressureSensor;
   friend class MatterOccupancySensor;
   friend class MatterOnOffPlugin;
